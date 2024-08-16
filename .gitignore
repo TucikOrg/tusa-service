@@ -1,0 +1,75 @@
+# Ignore Maven and Gradle directories
+target/
+build/
+
+# Ignore temporary files and directories
+*.log
+*.tmp
+*.bak
+*.swp
+*~.nib
+*.DS_Store
+
+# Ignore IDE-specific files
+/.idea/
+/.vscode/
+/*.iml
+/.classpath
+/.project
+/.settings/
+/.settings/
+
+# Ignore OS-specific files
+Thumbs.db
+.DS_Store
+
+# Ignore Eclipse files
+.classpath
+.project
+.settings/
+
+# Ignore IntelliJ IDEA files
+/.idea
+*.iws
+*.iml
+*.ipr
+out/
+
+# Ignore NetBeans files
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# Ignore macOS files
+.DS_Store
+
+# Ignore Windows files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Ignore build outputs
+/target/
+/build/
+/out/
+
+# Ignore log files
+*.log
+
+# Ignore environment variables
+.env
+
+# Ignore dependency caches
+**/node_modules/
+**/package-lock.json
+**/yarn.lock
+**/.pnp/
+**/.pnp.js
+
+# Ignore spring-boot specific files
+spring.log
+
+# Ignore test reports
+/test-results/
