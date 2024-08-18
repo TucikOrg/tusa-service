@@ -13,7 +13,7 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 
 
-@Entity
+@Entity(name = "token")
 class TokenEntity(
     @Column(unique = true) var token: String,
     @Enumerated(EnumType.STRING) var tokenType: TokenType,

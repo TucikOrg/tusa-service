@@ -4,7 +4,7 @@ import com.coltsclub.tusa.core.entity.TokenEntity
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.core.enums.Role
 import com.coltsclub.tusa.core.enums.TokenType
-import com.coltsclub.tusa.core.repository.SmsCodeRepository
+import com.coltsclub.tusa.core.model.AuthenticateInstruction
 import com.coltsclub.tusa.core.repository.TokenRepository
 import com.coltsclub.tusa.core.repository.UserRepository
 import org.springframework.security.authentication.AuthenticationManager
@@ -16,27 +16,29 @@ class AuthenticationService(
     private val authenticationManager: AuthenticationManager,
     private val userRepository: UserRepository,
     private val jwtService: JwtService,
-    private val tokenRepository: TokenRepository,
-    private val smsCodeRepository: SmsCodeRepository
+    private val tokenRepository: TokenRepository
 ) {
-    fun authenticate(phone: String, code: String): String {
-        val loginCode = smsCodeRepository.findLoginCode(phone, code)
-            .orElseThrow { throw IllegalArgumentException("Invalid code") }
-        smsCodeRepository.save(loginCode.apply { activated = true })
-
+    fun authenticate(phone: String, code: String, device: String): AuthenticateInstruction {
         authenticationManager.authenticate(
             UsernamePasswordAuthenticationToken(
                 phone,
                 code
             )
         )
-        val user = userRepository.findByPhone(phone).orElseGet {
-            userRepository.save(UserEntity("", phone, "", Role.USER))
+
+        var needTransferLocationToken = false
+        val userOpt = userRepository.findByPhone(phone)
+        val user = if (userOpt.isPresent) {
+            userOpt.get()
+        } else {
+            userRepository.save(UserEntity("", phone, "", Role.USER, devices = listOf(device)))
         }
+
+        needTransferLocationToken = user.devices.contains(device).not()
 
         val jwtToken = jwtService.generateToken(user)
         saveUserToken(user, jwtToken)
-        return jwtToken
+        return AuthenticateInstruction(jwtToken, needTransferLocationToken)
     }
 
     fun saveUserToken(user: UserEntity, jwtToken: String) {

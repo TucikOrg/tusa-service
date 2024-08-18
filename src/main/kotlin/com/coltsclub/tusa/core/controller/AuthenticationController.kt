@@ -15,8 +15,8 @@ class AuthenticationController(
 ) {
     @PostMapping("api/v1/auth/login")
     fun login(@RequestBody login: LoginDto): LoginResponseDto {
-        val token = authenticationService.authenticate(login.phone, login.code)
-        return LoginResponseDto(token)
+        val deviceAuthInstructions = authenticationService.authenticate(login.phone, login.code, login.device)
+        return LoginResponseDto(deviceAuthInstructions)
     }
 
     @PostMapping("api/v1/auth/send-code")

@@ -4,16 +4,13 @@ import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import java.time.LocalDateTime
 
-@Entity(name = "avatar")
-class AvatarEntity(
+@Entity(name = "friend")
+data class FriendEntity(
     val owner: String,
-    val creation: LocalDateTime = LocalDateTime.now(),
-    val avatar: ByteArray,
-    var phone: String? = null
+    val hasFriend: String,
 ) {
     @Id
-    @GeneratedValue(strategy= GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null
 }

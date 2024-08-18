@@ -11,12 +11,13 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.userdetails.UserDetails
 
 
-@Entity
+@Entity(name = "appUser")
 data class UserEntity(
     @Column(unique = true) var userUniqueName: String,
     val phone: String,
-    val name: String,
-    @Enumerated(EnumType.STRING) val role: Role
+    var name: String,
+    @Enumerated(EnumType.STRING) val role: Role,
+    var devices: List<String>
 ) : UserDetails {
     @Id
     @GeneratedValue
@@ -28,7 +29,7 @@ data class UserEntity(
 
     override fun getPassword() = ""
 
-    override fun getUsername() = userUniqueName
+    override fun getUsername() = phone
 
     override fun isAccountNonExpired() = true
 

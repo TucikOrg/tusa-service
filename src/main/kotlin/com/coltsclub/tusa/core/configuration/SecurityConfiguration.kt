@@ -20,7 +20,7 @@ import org.springframework.security.web.authentication.logout.LogoutHandler
 @EnableMethodSecurity
 class SecurityConfiguration(
     private val jwtAuthFilter: JwtAuthenticationFilter,
-    private val authenticationProvider: AuthenticationProvider,
+    private val smsCodeAuthenticationProvider: SmsCodeAuthenticationProvider,
     private val logoutHandler: LogoutHandler
 ) {
 
@@ -34,7 +34,7 @@ class SecurityConfiguration(
                     .anyRequest().authenticated()
             }
             .sessionManagement { session -> session.sessionCreationPolicy(STATELESS) }
-            .authenticationProvider(authenticationProvider)
+            .authenticationProvider(smsCodeAuthenticationProvider)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
             .logout { logout ->
                 logout.logoutUrl("/logout")
