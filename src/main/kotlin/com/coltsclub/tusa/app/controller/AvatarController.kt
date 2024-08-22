@@ -17,7 +17,7 @@ import org.springframework.web.multipart.MultipartFile
 class AvatarController(
     val avatarRepository: AvatarRepository
 ) {
-    @PostMapping("/avatar", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    @PostMapping("api/v1/avatar", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     fun addAvatar(file: MultipartFile, owner: String) {
         val context = SecurityContextHolder.getContext()
         var phone: String? = null
@@ -32,18 +32,18 @@ class AvatarController(
         avatarRepository.save(entity)
     }
 
-    @GetMapping("/avatar")
+    @GetMapping("api/v1/avatar")
     fun getAvatars(owner: String): List<AvatarEntity> {
         return avatarRepository.findAllByOwner(owner)
     }
 
-    @GetMapping("/avatar/image")
+    @GetMapping("api/v1/avatar/image")
     fun getAvatarImage(owner: String): ResponseEntity<ByteArray> {
         val avatar = avatarRepository.findLatestByOwner(owner).getOrNull()?.avatar ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(avatar)
     }
 
-    @PostMapping("/avatar/link-profile")
+    @PostMapping("api/v1/avatar/link-profile")
     @PreAuthorize("hasRole('USER')")
     fun linkAvatars(@RequestBody noLoginId: String) {
         val phone = SecurityContextHolder.getContext().authentication.name

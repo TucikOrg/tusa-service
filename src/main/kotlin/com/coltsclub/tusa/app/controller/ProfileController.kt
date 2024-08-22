@@ -1,6 +1,7 @@
 package com.coltsclub.tusa.app.controller
 
 import com.coltsclub.tusa.core.repository.UserRepository
+import org.springframework.security.access.annotation.Secured
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.GetMapping
@@ -10,16 +11,21 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@PreAuthorize("hasRole('USER')")
+@Secured("ROLE_USER")
 class ProfileController(
     private val userRepository: UserRepository
 ) {
     @PutMapping("api/v1/profile/userUniqueName")
-    fun changeUsername(@RequestBody username: String) {
+    fun changeUsername(@RequestBody uniqueName: String): Boolean {
         val phone = SecurityContextHolder.getContext().authentication.name
+        val exist = userRepository.findByUserUniqueName(uniqueName).isPresent
+        if (exist) {
+            return false
+        }
         val user = userRepository.findByPhone(phone).get()
-        user.userUniqueName = username
+        user.userUniqueName = uniqueName
         userRepository.save(user)
+        return true
     }
     
     @PutMapping("api/v1/profile/name")

@@ -13,7 +13,7 @@ import org.springframework.security.core.userdetails.UserDetails
 
 @Entity(name = "appUser")
 data class UserEntity(
-    @Column(unique = true) var userUniqueName: String,
+    @Column(unique = true) var userUniqueName: String?,
     val phone: String,
     var name: String,
     @Enumerated(EnumType.STRING) val role: Role,
