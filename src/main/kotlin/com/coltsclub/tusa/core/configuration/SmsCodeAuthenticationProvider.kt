@@ -1,9 +1,8 @@
 package com.coltsclub.tusa.core.configuration
 
-import com.coltsclub.tusa.core.errors.TusikBadRequest
+import com.coltsclub.tusa.core.exceptions.TusikBadRequest
 import com.coltsclub.tusa.core.repository.SmsCodeRepository
 import org.springframework.security.authentication.AuthenticationProvider
-import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
 import org.springframework.stereotype.Component

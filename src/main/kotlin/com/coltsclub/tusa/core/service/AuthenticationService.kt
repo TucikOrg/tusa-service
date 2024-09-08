@@ -18,7 +18,7 @@ class AuthenticationService(
     private val jwtService: JwtService,
     private val tokenRepository: TokenRepository
 ) {
-    fun authenticate(phone: String, code: String, device: String): LoginResponseDto {
+    fun authenticate(phone: String, code: String): LoginResponseDto {
         authenticationManager.authenticate(
             UsernamePasswordAuthenticationToken(
                 phone,
@@ -26,19 +26,20 @@ class AuthenticationService(
             )
         )
 
-        var needTransferLocationToken = false
         val userOpt = userRepository.findByPhone(phone)
         val user = if (userOpt.isPresent) {
             userOpt.get()
         } else {
-            userRepository.save(UserEntity(null, phone, "", Role.USER, devices = listOf(device)))
+            userRepository.save(UserEntity(null, phone, "", Role.USER))
         }
-
-        needTransferLocationToken = user.devices.contains(device).not()
 
         val jwtToken = jwtService.generateToken(user)
         saveUserToken(user, jwtToken)
-        return LoginResponseDto(user.userUniqueName?: "", user.name, jwtToken, needTransferLocationToken)
+        return LoginResponseDto(
+            uniqueName = user.userUniqueName?: "",
+            name = user.name,
+            jwt = jwtToken
+        )
     }
 
     fun saveUserToken(user: UserEntity, jwtToken: String) {

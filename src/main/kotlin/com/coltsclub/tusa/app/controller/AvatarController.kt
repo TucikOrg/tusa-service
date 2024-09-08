@@ -18,38 +18,26 @@ class AvatarController(
     val avatarRepository: AvatarRepository
 ) {
     @PostMapping("api/v1/avatar", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
-    fun addAvatar(file: MultipartFile, owner: String) {
+    @PreAuthorize("hasRole('USER')")
+    fun addAvatar(file: MultipartFile) {
         val context = SecurityContextHolder.getContext()
-        var phone: String? = null
-        if (context != null && context.authentication != null)
-            phone = context.authentication.name
+        val phone= context.authentication.name
 
         val entity = AvatarEntity(
-            owner = owner,
+            phone = phone,
             avatar = file.bytes,
-            phone = phone
         )
         avatarRepository.save(entity)
     }
 
     @GetMapping("api/v1/avatar")
-    fun getAvatars(owner: String): List<AvatarEntity> {
-        return avatarRepository.findAllByOwner(owner)
+    fun getAvatars(installAppId: String): List<AvatarEntity> {
+        return avatarRepository.findAllByPhone(installAppId)
     }
 
     @GetMapping("api/v1/avatar/image")
-    fun getAvatarImage(owner: String): ResponseEntity<ByteArray> {
-        val avatar = avatarRepository.findLatestByOwner(owner).getOrNull()?.avatar ?: return ResponseEntity.notFound().build()
+    fun getAvatarImage(phone: String): ResponseEntity<ByteArray> {
+        val avatar = avatarRepository.findLatestByPhone(phone).getOrNull()?.avatar ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(avatar)
-    }
-
-    @PostMapping("api/v1/avatar/link-profile")
-    @PreAuthorize("hasRole('USER')")
-    fun linkAvatars(@RequestBody noLoginId: String) {
-        val phone = SecurityContextHolder.getContext().authentication.name
-        val avatars = avatarRepository.findAllByOwner(noLoginId).filter { it.phone == null }
-        avatars.forEach { it.phone = phone }
-        if (avatars.isNotEmpty())
-            avatarRepository.saveAll(avatars)
     }
 }

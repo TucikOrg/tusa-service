@@ -1,7 +1,7 @@
 package com.coltsclub.tusa.app.dto
 
-class AddLocationDto(
-    val identifier: String,
-    val latitude: Float,
-    val longitude: Float
+data class AddLocationDto(
+    val installAppId: String,
+    val latitude: String,
+    val longitude: String
 )

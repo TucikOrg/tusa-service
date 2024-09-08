@@ -30,7 +30,9 @@ class SecurityConfiguration(
                     "v3/api-docs/**",
                     "api/v1/auth/**",
                     "api/v1/avatar",
-                    "api/v1/avatar/**"
+                    "api/v1/avatar/**",
+                    "api/v1/legal/**",
+                    "api/v1/location/**"
                 )
                     .permitAll()
                     .anyRequest().authenticated()
@@ -39,9 +41,11 @@ class SecurityConfiguration(
             .authenticationProvider(smsCodeAuthenticationProvider)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
             .logout { logout ->
-                logout.logoutUrl("/logout")
+                logout.logoutUrl("api/v1/logout")
                     .addLogoutHandler(logoutHandler)
-                    .logoutSuccessHandler { request, response, authentication -> SecurityContextHolder.clearContext() }
+                    .logoutSuccessHandler { request, response, authentication ->
+                        SecurityContextHolder.clearContext()
+                    }
             }
         return http.build()
     }

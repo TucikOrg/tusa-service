@@ -16,8 +16,7 @@ data class UserEntity(
     @Column(unique = true) var userUniqueName: String?,
     val phone: String,
     var name: String,
-    @Enumerated(EnumType.STRING) val role: Role,
-    var devices: List<String>
+    @Enumerated(EnumType.STRING) val role: Role
 ) : UserDetails {
     @Id
     @GeneratedValue

@@ -8,10 +8,9 @@ import java.time.LocalDateTime
 
 @Entity(name = "avatar")
 class AvatarEntity(
-    val owner: String,
-    val creation: LocalDateTime = LocalDateTime.now(),
+    var phone: String,
     val avatar: ByteArray,
-    var phone: String? = null
+    val creation: LocalDateTime = LocalDateTime.now(),
 ) {
     @Id
     @GeneratedValue(strategy= GenerationType.AUTO)
