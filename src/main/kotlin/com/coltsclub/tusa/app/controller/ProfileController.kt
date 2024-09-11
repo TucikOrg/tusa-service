@@ -1,5 +1,7 @@
 package com.coltsclub.tusa.app.controller
 
+import com.coltsclub.tusa.app.dto.ChangeNameDto
+import com.coltsclub.tusa.app.dto.ChangeUniqueNameDto
 import com.coltsclub.tusa.core.repository.UserRepository
 import org.springframework.security.access.annotation.Secured
 import org.springframework.security.access.prepost.PreAuthorize
@@ -16,23 +18,23 @@ class ProfileController(
     private val userRepository: UserRepository
 ) {
     @PutMapping("api/v1/profile/userUniqueName")
-    fun changeUsername(@RequestBody uniqueName: String): Boolean {
+    fun changeUsername(@RequestBody changeUniqueName: ChangeUniqueNameDto): Boolean {
         val phone = SecurityContextHolder.getContext().authentication.name
-        val exist = userRepository.findByUserUniqueName(uniqueName).isPresent
+        val exist = userRepository.findByUserUniqueName(changeUniqueName.uniqueName).isPresent
         if (exist) {
             return false
         }
         val user = userRepository.findByPhone(phone).get()
-        user.userUniqueName = uniqueName
+        user.userUniqueName = changeUniqueName.uniqueName
         userRepository.save(user)
         return true
     }
     
     @PutMapping("api/v1/profile/name")
-    fun changeName(@RequestBody name: String) {
+    fun changeName(@RequestBody changeName: ChangeNameDto) {
         val phone = SecurityContextHolder.getContext().authentication.name
         val user = userRepository.findByPhone(phone).get()
-        user.name = name
+        user.name = changeName.name
         userRepository.save(user)
     }
 

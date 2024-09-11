@@ -1,6 +1,6 @@
 package com.coltsclub.tusa.core.configuration
 
-import com.coltsclub.tusa.core.exceptions.TusikBadRequest
+import com.coltsclub.tusa.core.exceptions.TucikBadRequest
 import com.coltsclub.tusa.core.repository.SmsCodeRepository
 import org.springframework.security.authentication.AuthenticationProvider
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -17,7 +17,7 @@ class SmsCodeAuthenticationProvider(
         val code = authentication.credentials.toString()
 
         val loginCode = smsCodeRepository.findLoginCode(phone, code)
-            .orElseThrow { throw TusikBadRequest("Invalid code") }
+            .orElseThrow { throw TucikBadRequest("Invalid code") }
         smsCodeRepository.save(loginCode.apply { activated = true })
 
         return UsernamePasswordAuthenticationToken(phone, code, ArrayList())

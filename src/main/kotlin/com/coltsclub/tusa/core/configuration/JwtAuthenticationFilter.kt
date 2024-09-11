@@ -5,10 +5,13 @@ import com.coltsclub.tusa.core.service.JwtService
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.core.userdetails.UserDetailsService
+import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
@@ -19,6 +22,8 @@ class JwtAuthenticationFilter(
     private val userDetailsService: UserDetailsService,
     private val tokenRepository: TokenRepository
 ) : OncePerRequestFilter() {
+    private val logger: Logger = LoggerFactory.getLogger(JwtAuthenticationFilter::class.java)
+
     override fun doFilterInternal(
         request: HttpServletRequest,
         response: HttpServletResponse,
@@ -39,21 +44,29 @@ class JwtAuthenticationFilter(
         if (jwt.isBlank()) {
             return
         }
-        val userId = jwtService.extractUsername(jwt)
-        if (userId != null && SecurityContextHolder.getContext().authentication == null) {
-            val userDetails: UserDetails = this.userDetailsService.loadUserByUsername(userId)
-            val tokenEntity = tokenRepository.findByToken(jwt).get()
-            val isTokenValid = !tokenEntity.expired && !tokenEntity.revoked
-            if (jwtService.isTokenValid(jwt, userDetails) && isTokenValid) {
-                val authToken = UsernamePasswordAuthenticationToken(
-                    userDetails,
-                    null,
-                    userDetails.authorities
-                )
-                authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
-                SecurityContextHolder.getContext().authentication = authToken
+
+        try {
+            val userId = jwtService.extractUsername(jwt)
+            if (userId != null && SecurityContextHolder.getContext().authentication == null) {
+                val userDetails: UserDetails = this.userDetailsService.loadUserByUsername(userId)
+                val tokenEntity = tokenRepository.findByToken(jwt).get()
+                val isTokenValid = !tokenEntity.expired && !tokenEntity.revoked
+                if (isTokenValid) {
+                    val authToken = UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.authorities
+                    )
+                    authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
+                    SecurityContextHolder.getContext().authentication = authToken
+                }
             }
+        } catch (usernameNotFoundException: UsernameNotFoundException) {
+            logger.info("User not found")
+        } catch (exception: Exception) {
+            logger.info("Not determined error")
         }
+
         filterChain.doFilter(request, response)
     }
 }

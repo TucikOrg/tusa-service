@@ -1,5 +1,6 @@
 package com.coltsclub.tusa.core.exceptions
 
+import io.jsonwebtoken.ExpiredJwtException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.BadCredentialsException
@@ -18,6 +19,7 @@ class GlobalExceptionHandler {
         when (ex) {
             is BadCredentialsException -> return ResponseEntity(ex.message, HttpStatus.FORBIDDEN)
             is UsernameNotFoundException -> return ResponseEntity(ex.message, HttpStatus.NOT_FOUND)
+            is ExpiredJwtException -> return ResponseEntity(ex.message, HttpStatus.BAD_REQUEST)
         }
         return ResponseEntity(ex.message, HttpStatus.BAD_REQUEST)
     }

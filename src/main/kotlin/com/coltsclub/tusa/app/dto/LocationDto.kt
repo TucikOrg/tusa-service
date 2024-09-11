@@ -1,6 +1,7 @@
 package com.coltsclub.tusa.app.dto
 
-data class AddLocationDto(
+data class LocationDto(
+    val phone: String,
     val latitude: Float,
     val longitude: Float
 )

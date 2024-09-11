@@ -1,6 +1,6 @@
 package com.coltsclub.tusa.app.controller
 
-import com.coltsclub.tusa.app.service.EncryptionService
+import com.coltsclub.tusa.core.service.EncryptionService
 import javax.crypto.SecretKey
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RestController

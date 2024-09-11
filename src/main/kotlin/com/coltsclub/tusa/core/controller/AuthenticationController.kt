@@ -2,6 +2,7 @@ package com.coltsclub.tusa.core.controller
 
 import com.coltsclub.tusa.core.dto.LoginDto
 import com.coltsclub.tusa.core.dto.LoginResponseDto
+import com.coltsclub.tusa.core.dto.SendCodeDto
 import com.coltsclub.tusa.core.service.AuthenticationService
 import com.coltsclub.tusa.core.service.SmsService
 import org.springframework.web.bind.annotation.PostMapping
@@ -19,7 +20,7 @@ class AuthenticationController(
     }
 
     @PostMapping("api/v1/auth/send-code")
-    fun sendCode(@RequestBody phone: String) {
-        smsService.sendCodeSms(phone)
+    fun sendCode(@RequestBody sendCode: SendCodeDto) {
+        smsService.sendCodeSms(sendCode.phone)
     }
 }

@@ -9,7 +9,7 @@ interface SmsCodeRepository : JpaRepository<SmsCodeEntity, Long> {
 
     @Query(
         value = """
-          select s from smsCode s 
+          select s from smsCode s
           where s.phone = :phone and s.code = :code and s.activated = false and s.expiredAt > current_timestamp
         """
     )
