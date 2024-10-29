@@ -25,7 +25,7 @@ class CoreConfiguration(
     @Bean
     fun userDetailsService(): UserDetailsService {
         return UserDetailsService { username ->
-            repository.findByPhone(username)
+            repository.findById(username.toLong())
                 .orElseThrow { UsernameNotFoundException("User not found") }
         }
     }

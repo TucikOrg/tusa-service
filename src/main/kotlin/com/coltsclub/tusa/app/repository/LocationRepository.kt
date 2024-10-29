@@ -8,9 +8,9 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface LocationRepository: CrudRepository<LocationEntity, Long> {
-    @Query("SELECT e FROM location e WHERE e.phone = :phone ORDER BY e.creation DESC LIMIT 1")
-    fun findTopByPhoneAndByOrderByCreationDesc(phone: String): Optional<LocationEntity>
+    @Query("SELECT e FROM location e WHERE e.ownerId = :ownerId ORDER BY e.creation DESC LIMIT 1")
+    fun findTopByOwnerIdAndByOrderByCreationDesc(ownerId: Long): Optional<LocationEntity>
 
-    @Query("SELECT e FROM location e WHERE e.phone = :phone")
-    fun findAllByPhone(phone: String): List<LocationEntity>
+    @Query("SELECT e FROM location e WHERE e.ownerId = :ownerId")
+    fun findAllByOwnerId(ownerId: Long): List<LocationEntity>
 }

@@ -8,10 +8,9 @@ import java.time.LocalDateTime
 
 @Entity(name = "friendRequest")
 data class FriendRequestEntity(
-    val fromPhone: String,
-    val toPhone: String,
-    val date: LocalDateTime = LocalDateTime.now(),
-    val activated: Boolean = false
+    val fromUserId: Long,
+    val toUserId: Long,
+    val date: LocalDateTime = LocalDateTime.now()
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -9,16 +9,18 @@ interface FriendRequestRepository : JpaRepository<FriendRequestEntity, Long> {
     @Query(
         value = """
           select f from friendRequest f 
-          where f.fromPhone = :fromPhone and f.toPhone = :toPhone and f.activated = false
+          where f.fromUserId = :fromUserId and f.toUserId = :toUserId
         """
     )
-    fun findActiveFriendRequest(fromPhone: String, toPhone: String): Optional<FriendRequestEntity>
+    fun findFriendRequest(fromUserId: Long, toUserId: Long): Optional<FriendRequestEntity>
 
     @Query(
         value = """
           select f from friendRequest f 
-          where f.toPhone = :toPhone and f.activated = false
+          where f.toUserId = :toUserId
         """
     )
-    fun findToMeRequests(toPhone: String): List<FriendRequestEntity>
+    fun findToUserRequests(toUserId: Long): List<FriendRequestEntity>
+
+    fun deleteByFromUserIdAndToUserId(requestFrom: Long, userId: Long)
 }

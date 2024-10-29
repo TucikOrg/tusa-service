@@ -38,7 +38,9 @@ class AuthenticationService(
         return LoginResponseDto(
             uniqueName = user.userUniqueName?: "",
             name = user.name,
-            jwt = jwtToken
+            jwt = jwtToken,
+            id = user.id!!,
+            phone = user.phone
         )
     }
 

@@ -6,8 +6,8 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.CrudRepository
 
 interface AvatarRepository: CrudRepository<AvatarEntity, Long> {
-    fun findAllByPhone(phone: String): List<AvatarEntity>
+    fun findAllByOwnerId(ownerId: Long): List<AvatarEntity>
 
-    @Query("SELECT e FROM avatar e WHERE e.phone = :phone ORDER BY e.creation DESC LIMIT 1")
-    fun findLatestByPhone(phone: String): Optional<AvatarEntity>
+    @Query("SELECT e FROM avatar e WHERE e.ownerId = :ownerId ORDER BY e.creation DESC LIMIT 1")
+    fun findLatestByOwnerId(ownerId: Long): Optional<AvatarEntity>
 }

@@ -10,7 +10,6 @@ import jakarta.persistence.Id
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.userdetails.UserDetails
 
-
 @Entity(name = "appUser")
 data class UserEntity(
     @Column(unique = true) var userUniqueName: String?,
@@ -20,7 +19,7 @@ data class UserEntity(
 ) : UserDetails {
     @Id
     @GeneratedValue
-    private val id: Long? = null
+    val id: Long? = null
 
     override fun getAuthorities(): List<SimpleGrantedAuthority> {
         return role.getAuthorities()
@@ -28,7 +27,7 @@ data class UserEntity(
 
     override fun getPassword() = ""
 
-    override fun getUsername() = phone
+    override fun getUsername() = id.toString()
 
     override fun isAccountNonExpired() = true
 

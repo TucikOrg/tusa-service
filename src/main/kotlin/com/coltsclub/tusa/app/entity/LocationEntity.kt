@@ -8,7 +8,7 @@ import java.time.LocalDateTime
 
 @Entity(name = "location")
 class LocationEntity(
-    var phone: String,
+    var ownerId: Long,
     val latitude: String,
     val longitude: String,
     val creation: LocalDateTime = LocalDateTime.now()

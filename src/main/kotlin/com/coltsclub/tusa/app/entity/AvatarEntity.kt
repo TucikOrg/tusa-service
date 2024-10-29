@@ -8,7 +8,7 @@ import java.time.LocalDateTime
 
 @Entity(name = "avatar")
 class AvatarEntity(
-    var phone: String,
+    var ownerId: Long,
     val avatar: ByteArray,
     val creation: LocalDateTime = LocalDateTime.now(),
 ) {

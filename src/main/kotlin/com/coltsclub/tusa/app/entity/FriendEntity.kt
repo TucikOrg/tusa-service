@@ -7,8 +7,8 @@ import jakarta.persistence.Id
 
 @Entity(name = "friend")
 data class FriendEntity(
-    val owner: String,
-    val hasFriend: String,
+    val fromUserId: Long,
+    val toUserId: Long,
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
