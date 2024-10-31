@@ -7,6 +7,7 @@ import com.coltsclub.tusa.app.entity.FriendRequestEntity
 import com.coltsclub.tusa.app.repository.FriendRepository
 import com.coltsclub.tusa.app.repository.FriendRequestRepository
 import com.coltsclub.tusa.core.repository.UserRepository
+import jakarta.transaction.Transactional
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 
@@ -28,42 +29,53 @@ class FriendsService(
         return friendRepository.findAllByFromUserIdAndToUserIdIn(userId, users).map { it.toUserId }
     }
 
-    fun addFriend(from: Long, requestTo: Long): FriendRequestEntity {
+    fun addFriend(from: Long, requestTo: Long): List<FriendRequestDto> {
+        // Проверяем существует ли заявка в друзья
         val friendRequestOpt = friendRequestRepository.findFriendRequest(from, requestTo)
-        if (!friendRequestOpt.isPresent) {
-            val friendRequest = friendRequestRepository.save(FriendRequestEntity(from, requestTo))
-            return friendRequest
+        if (friendRequestOpt.isPresent) {
+            return emptyList()
         }
 
-        return friendRequestOpt.get()
+        // Еслинету то создаем
+        friendRequestRepository.save(FriendRequestEntity(from, requestTo))
+
+        val users = userRepository.findAllById(listOf(from, requestTo)).toList()
+        return users.map { user ->
+            FriendRequestDto(user.id, user.name, user.userUniqueName)
+        }
     }
 
+    @Transactional
     fun deleteFriend(userId: Long, deleteFriend: Long) {
         friendRepository.deleteByFromUserIdAndToUserId(userId, deleteFriend)
         friendRepository.deleteByFromUserIdAndToUserId(deleteFriend, userId)
     }
 
-    fun acceptFriend(userId: Long, requestFrom: Long): FriendDto {
+    fun acceptFriend(userId: Long, requestFrom: Long): List<FriendDto> {
+        // Ищем заявку от другого пользователя
         val friendRequest = friendRequestRepository.findFriendRequest(requestFrom, userId)
         if (friendRequest.isEmpty) {
             throw Exception("Friend request not found")
         }
+        // если она есть то удяляем ее
         friendRequestRepository.delete(friendRequest.get())
 
+        // если мы отпраявляли заявку этому пользователю то ее тоже надо удалить
         val requestSecond = friendRequestRepository.findFriendRequest(userId, requestFrom)
         if (requestSecond.isPresent) {
             friendRequestRepository.delete(requestSecond.get())
         }
 
+        // сохраняем двух друзей
         val save = listOf(FriendEntity(userId, requestFrom), FriendEntity(requestFrom, userId))
-        friendRepository.saveAll(save)
+        val result = friendRepository.saveAll(save)
 
-        val userOpt = userRepository.findById(requestFrom)
-        if (userOpt.isEmpty) {
-            throw Exception("User not found")
+        // новые друзья как пользователи
+        val friendUsers = userRepository.findAllById(result.map { it.toUserId }).toList()
+
+        return friendUsers.map { user ->
+            FriendDto(user.id, user.name, user.userUniqueName)
         }
-        val user = userOpt.get()
-        return FriendDto(user.id, user.name, user.userUniqueName)
     }
 
     fun getToMeRequests(userId: Long): List<FriendRequestDto> {
@@ -74,6 +86,7 @@ class FriendsService(
         }
     }
 
+    @Transactional
     fun deleteRequest(userId: Long, requestFrom: Long) {
         friendRequestRepository.deleteByFromUserIdAndToUserId(requestFrom, userId)
     }

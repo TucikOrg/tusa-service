@@ -10,7 +10,7 @@ import java.time.LocalDateTime
 class AvatarEntity(
     var ownerId: Long,
     val avatar: ByteArray,
-    val creation: LocalDateTime = LocalDateTime.now(),
+    val creation: LocalDateTime = LocalDateTime.now()
 ) {
     @Id
     @GeneratedValue(strategy= GenerationType.AUTO)
