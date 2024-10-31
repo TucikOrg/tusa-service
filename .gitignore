@@ -16,6 +16,7 @@ build/
 /*.iml
 /.classpath
 /.project
+/.gradle/
 /.settings/
 /.settings/
 
