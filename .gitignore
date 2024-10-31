@@ -1,6 +1,7 @@
 # Ignore Maven and Gradle directories
 target/
 build/
+/.gradle/
 
 # Ignore temporary files and directories
 *.log
@@ -16,8 +17,6 @@ build/
 /*.iml
 /.classpath
 /.project
-/.gradle/
-/.settings/
 /.settings/
 
 # Ignore OS-specific files
