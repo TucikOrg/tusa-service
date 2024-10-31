@@ -22,9 +22,6 @@ jobs:
           distribution: 'oracle' # See 'Supported distributions' for available options
           java-version: '22'
           cache: 'gradle'
-          cache-dependency-path: | # optional
-            sub-project/*.gradle*
-            sub-project/**/gradle-wrapper.properties
 
       # Run the Gradle task
       - name: Run updateMetaForDocker
