@@ -1,0 +1,16 @@
+name: Manual Deploy Workflow
+
+on:
+  workflow_dispatch:  # Enables manual trigger
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Deploy
+        run: |
+          cd /opt/tucik
+          docker compose down | true
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          docker compose pull | true
+          docker compose up -d
