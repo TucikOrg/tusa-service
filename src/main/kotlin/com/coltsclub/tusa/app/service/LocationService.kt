@@ -17,7 +17,7 @@ class LocationService(
     val friendsService: FriendsService
 ) {
     // value secret key
-    @Value("\${app.tucik.secret-key}")
+    @Value("\${app.tucik.secret.key}")
     private lateinit var secretKeyStr: String
 
     private var secretKey: SecretKey? = null

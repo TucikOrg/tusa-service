@@ -28,7 +28,8 @@ class SmsService(
     @Value("\${app.sms.url}")
     private lateinit var sendMessageUrl: String
 
-    private var sendRealSms = false
+    @Value("\${app.sms.send.real.sms}")
+    private var sendRealSms: Boolean = false
 
     fun sendCodeSms(phone: String): Boolean {
         var success = true

@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service
 
 @Service
 class JwtService {
-    @Value("\${app.security.jwt.secret-key}")
+    @Value("\${app.security.jwt.secret.key}")
     private val secretKey: String? = null
 
     fun extractUsername(token: String): String? {
