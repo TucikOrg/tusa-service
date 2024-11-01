@@ -34,7 +34,6 @@ class SmsService(
     fun sendCodeSms(phone: String): Boolean {
         var success = true
         val code = (1000..9999).random().toString()
-        logger.info("Send sms with code $code to $phone")
 
         if (sendRealSms) {
             val headers = org.springframework.http.HttpHeaders()
@@ -45,9 +44,13 @@ class SmsService(
                 .queryParam("text", "Ваш код подтверждения: $code")
                 .build().toUri()
             val entity = HttpEntity<String>(headers)
+            logger.info("Send sms with code $code to $phone")
             val response: ResponseEntity<String> = restTemplate.exchange(uri, HttpMethod.GET, entity, String::class.java)
             val body = response.body
+            logger.info("Response: $body")
             success = body?.contains("accepted")?: false
+        } else {
+            logger.info("Code $code for $phone")
         }
 
         if (success) {
