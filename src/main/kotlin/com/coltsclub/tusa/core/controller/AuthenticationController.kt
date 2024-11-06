@@ -34,24 +34,29 @@ class AuthenticationController(
             .setAudience(Collections.singletonList(googleClientId))
             .build()
 
-        val idToken: GoogleIdToken? = googleVerifier.verify(idTokenString)
-        if (idToken != null) {
-            val payload: IdToken.Payload = idToken.payload
-            val userId: String = payload.subject
-            logger.info("User ID: $userId")
+        try {
+            val idToken: GoogleIdToken? = googleVerifier.verify(idTokenString)
+            if (idToken != null) {
+                val payload: IdToken.Payload = idToken.payload
+                val userId: String = payload.subject
+                logger.info("User ID: $userId")
 
-            // Get profile information from payload
-            val email: String = payload["email"] as String
-            val name = payload["name"] as String
-            val pictureUrl = payload["picture"] as String
+                // Get profile information from payload
+                val email: String = payload["email"] as String
+                val name = payload["name"] as String
+                val pictureUrl = payload["picture"] as String
 
-            val response = authenticationService.authenticate(
-                gmail = email,
-                pictureUrl = pictureUrl,
-                name = name
-            )
-            return response
+                val response = authenticationService.authenticate(
+                    gmail = email,
+                    pictureUrl = pictureUrl,
+                    name = name
+                )
+                return response
+            }
+        } catch (exception: Exception) {
+            exception.printStackTrace()
         }
+
 
         throw BadCredentialsException("Invalid google token")
     }
