@@ -22,7 +22,6 @@ class SwaggerConfiguration {
     @Bean
     fun openAPI(): OpenAPI {
         return OpenAPI()
-            .addServersItem(Server())
             .addServersItem(Server().url("http://192.168.0.103:8080"))
             .addServersItem(Server().url("https://tucik.fun"))
             .addServersItem(Server().url("http://89.111.174.188:8080"))
