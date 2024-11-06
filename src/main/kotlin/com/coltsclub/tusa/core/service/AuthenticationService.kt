@@ -7,6 +7,7 @@ import com.coltsclub.tusa.core.enums.Role
 import com.coltsclub.tusa.core.enums.TokenType
 import com.coltsclub.tusa.core.repository.TokenRepository
 import com.coltsclub.tusa.core.repository.UserRepository
+import java.util.Optional
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.stereotype.Service
@@ -18,29 +19,47 @@ class AuthenticationService(
     private val jwtService: JwtService,
     private val tokenRepository: TokenRepository
 ) {
-    fun authenticate(phone: String, code: String): LoginResponseDto {
+    fun authenticate(
+        gmail: String?,
+        pictureUrl: String?,
+        name: String?
+    ): LoginResponseDto {
+        // Тут пользователь уже авторизован
         authenticationManager.authenticate(
             UsernamePasswordAuthenticationToken(
-                phone,
-                code
+                gmail,
+                "google"
             )
         )
 
-        val userOpt = userRepository.findByPhone(phone)
+        var userOpt = Optional.empty<UserEntity>()
+        if (gmail != null) {
+            userOpt = userRepository.findByGmail(gmail)
+        }
+
         val user = if (userOpt.isPresent) {
             userOpt.get()
         } else {
-            userRepository.save(UserEntity(null, phone, "", Role.USER))
+            userRepository.save(UserEntity(
+                userUniqueName = null,
+                phone = "",
+                name = name,
+                role = Role.USER,
+                gmail = gmail
+            ))
         }
 
         val jwtToken = jwtService.generateToken(user)
         saveUserToken(user, jwtToken)
+
         return LoginResponseDto(
             uniqueName = user.userUniqueName?: "",
-            name = user.name,
+            name = user.name?: "",
             jwt = jwtToken,
             id = user.id!!,
-            phone = user.phone
+            phone = user.phone?: "",
+            gmail = user.gmail?: "",
+            pictureUrl = pictureUrl?: ""
         )
     }
 

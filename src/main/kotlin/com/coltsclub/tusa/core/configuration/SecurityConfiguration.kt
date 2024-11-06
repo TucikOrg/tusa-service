@@ -16,7 +16,7 @@ import org.springframework.security.web.authentication.logout.LogoutHandler
 @EnableMethodSecurity
 class SecurityConfiguration(
     private val jwtAuthFilter: JwtAuthenticationFilter,
-    private val smsCodeAuthenticationProvider: SmsCodeAuthenticationProvider,
+    private val smsCodeAuthenticationProvider: TucikAuthenticationProvider,
     private val logoutHandler: LogoutHandler
 ) {
 

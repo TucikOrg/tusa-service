@@ -21,7 +21,7 @@ class FriendsService(
         val friends = friendRepository.findByFromUserId(userId)
         val users = userRepository.findAllById(friends.map { it.toUserId }).toList()
         return users.map { user ->
-            FriendDto(user.id, user.name, user.userUniqueName)
+            FriendDto(user.id, user.name?: "", user.userUniqueName)
         }
     }
 
@@ -41,7 +41,7 @@ class FriendsService(
 
         val users = userRepository.findAllById(listOf(from, requestTo)).toList()
         return users.map { user ->
-            FriendRequestDto(user.id, user.name, user.userUniqueName)
+            FriendRequestDto(user.id, user.name?: "", user.userUniqueName)
         }
     }
 
@@ -74,7 +74,7 @@ class FriendsService(
         val friendUsers = userRepository.findAllById(result.map { it.toUserId }).toList()
 
         return friendUsers.map { user ->
-            FriendDto(user.id, user.name, user.userUniqueName)
+            FriendDto(user.id, user.name?: "", user.userUniqueName)
         }
     }
 
@@ -82,7 +82,7 @@ class FriendsService(
         val requests = friendRequestRepository.findToUserRequests(userId)
         val users = userRepository.findAllById(requests.map { it.fromUserId }).toList()
         return users.map { user ->
-            FriendRequestDto(user.id, user.name, user.userUniqueName)
+            FriendRequestDto(user.id, user.name?: "", user.userUniqueName)
         }
     }
 
@@ -94,7 +94,7 @@ class FriendsService(
     fun findUsers(userId: Long, name: String): List<FriendDto> {
         val users = userRepository.findCandidateFriends(name, userId, Pageable.ofSize(10))
         return users.map { user ->
-            FriendDto(user.id, user.name, user.userUniqueName)
+            FriendDto(user.id, user.name?: "", user.userUniqueName)
         }
     }
 }

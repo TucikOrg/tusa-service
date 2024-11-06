@@ -22,6 +22,7 @@ class SwaggerConfiguration {
     @Bean
     fun openAPI(): OpenAPI {
         return OpenAPI()
+            .addServersItem(Server().url("http://192.168.0.103:8080"))
             .addServersItem(Server().url("https://tucik.fun"))
             .addSecurityItem(SecurityRequirement().addList("BearerAuthentication"))
             .components(Components().addSecuritySchemes("BearerAuthentication", createAPIKeyScheme()))

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 
 interface UserRepository : JpaRepository<UserEntity, Long> {
+    fun findByGmail(gmail: String): Optional<UserEntity>
     fun findByPhone(phone: String): Optional<UserEntity>
     fun findByUserUniqueName(userUniqueName: String): Optional<UserEntity>
 
