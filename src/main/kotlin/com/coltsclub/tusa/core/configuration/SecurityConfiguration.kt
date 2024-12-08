@@ -16,7 +16,7 @@ import org.springframework.security.web.authentication.logout.LogoutHandler
 @EnableMethodSecurity
 class SecurityConfiguration(
     private val jwtAuthFilter: JwtAuthenticationFilter,
-    private val smsCodeAuthenticationProvider: TucikAuthenticationProvider,
+    private val authenticationProvider: TucikAuthenticationProvider,
     private val logoutHandler: LogoutHandler
 ) {
 
@@ -25,20 +25,23 @@ class SecurityConfiguration(
         http
             .csrf { csrf -> csrf.disable() }
             .authorizeHttpRequests { req ->
-                req.requestMatchers(
-                    "swagger-ui/**",
-                    "v3/api-docs/**",
-                    "api/v1/auth/**",
-                    "api/v1/avatar",
-                    "api/v1/avatar/**",
-                    "api/v1/legal/**",
-                    "api/v1/location/**"
-                )
-                    .permitAll()
-                    .anyRequest().authenticated()
+                req.anyRequest().permitAll()
+//                req.requestMatchers(
+//                    "swagger-ui/**",
+//                    "v3/api-docs/**",
+//                    "api/v1/auth/**",
+//                    "api/v1/avatar",
+//                    "api/v1/avatar/**",
+//                    "api/v1/legal/**",
+//                    "api/v1/location/**",
+//                    "/"
+//                )
+//                    .permitAll()
+//                    .anyRequest()
+//                    .authenticated()
             }
             .sessionManagement { session -> session.sessionCreationPolicy(STATELESS) }
-            .authenticationProvider(smsCodeAuthenticationProvider)
+            .authenticationProvider(authenticationProvider)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
             .logout { logout ->
                 logout.logoutUrl("api/v1/logout")

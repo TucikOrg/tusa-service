@@ -4,6 +4,7 @@ import io.jsonwebtoken.ExpiredJwtException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.BadCredentialsException
+import org.springframework.security.authorization.AuthorizationDeniedException
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -20,6 +21,7 @@ class GlobalExceptionHandler {
             is BadCredentialsException -> return ResponseEntity(ex.message, HttpStatus.FORBIDDEN)
             is UsernameNotFoundException -> return ResponseEntity(ex.message, HttpStatus.NOT_FOUND)
             is ExpiredJwtException -> return ResponseEntity(ex.message, HttpStatus.BAD_REQUEST)
+            is AuthorizationDeniedException -> return ResponseEntity(ex.message, HttpStatus.UNAUTHORIZED)
         }
         return ResponseEntity(ex.message, HttpStatus.BAD_REQUEST)
     }
