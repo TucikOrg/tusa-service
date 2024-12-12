@@ -1,6 +1,11 @@
 package com.coltsclub.tusa.core.socket
 
+import com.coltsclub.tusa.app.dto.AddUserDto
+import com.coltsclub.tusa.app.dto.AllUsersRequest
 import com.coltsclub.tusa.app.dto.AvatarDTO
+import com.coltsclub.tusa.app.dto.CreatedUser
+import com.coltsclub.tusa.app.dto.User
+import com.coltsclub.tusa.app.dto.UsersPage
 import com.coltsclub.tusa.app.service.FriendsService
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.app.service.AvatarService
@@ -11,6 +16,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Pageable
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.web.socket.BinaryMessage
 import org.springframework.web.socket.CloseStatus
@@ -22,7 +29,7 @@ class WebSocketHandler(
     private val friendsService: FriendsService,
     private val profileService: ProfileService,
     private val avatarService: AvatarService,
-    private val locationService: LocationService
+    private val locationService: LocationService,
 ) : BinaryWebSocketHandler() {
     private val sessions = ConcurrentHashMap<Long, MutableList<WebSocketSession>>()
 
@@ -44,9 +51,40 @@ class WebSocketHandler(
 
     @OptIn(ExperimentalSerializationApi::class)
     override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {
+
         val user = session.user()
         val socketMessage = Cbor.decodeFromByteArray<SocketBinaryMessage>(message.payload.array())
         when (socketMessage.type) {
+            // Admin actions
+            "create-user" -> {
+                val newUserData = Cbor.decodeFromByteArray<AddUserDto>(socketMessage.data)
+                val created = profileService.createUser(newUserData.uniqueName, newUserData.gmail, null) ?: return
+                val data = Cbor.encodeToByteArray(CreatedUser(
+                    name = created.name,
+                    uniqueName = created.userUniqueName,
+                    id = created.id!!
+                ))
+                val response = Cbor.encodeToByteArray(SocketBinaryMessage("created-user", data))
+                session.sendMessage(BinaryMessage(response))
+            }
+            "all-users" -> {
+                val request = Cbor.decodeFromByteArray<AllUsersRequest>(socketMessage.data)
+                val users = profileService.getUsers(request.uniqueName, PageRequest.of(request.page, request.size))
+                val usersPage = UsersPage(
+                    users = users.map { User(
+                        id = it.id!!,
+                        name = it.name,
+                        uniqueName = it.userUniqueName,
+                        gmail = it.gmail
+                    ) }.toList(),
+                    pagesCount = users.totalPages
+                )
+                val data = Cbor.encodeToByteArray(usersPage)
+                val response = Cbor.encodeToByteArray(SocketBinaryMessage("all-users", data))
+                session.sendMessage(BinaryMessage(response))
+            }
+
+            // user actions
             "friends-avatars" -> {
                 // хочу получить аватарки друзей
                 val friends = friendsService.getFriends(user.id!!)

@@ -1,5 +1,6 @@
 package com.coltsclub.tusa.core.service
 
+import com.coltsclub.tusa.app.service.ProfileService
 import com.coltsclub.tusa.core.dto.LoginResponseDto
 import com.coltsclub.tusa.core.entity.TokenEntity
 import com.coltsclub.tusa.core.entity.UserEntity
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Service
 @Service
 class AuthenticationService(
     private val authenticationManager: AuthenticationManager,
-    private val userRepository: UserRepository,
+    private val profileService: ProfileService,
     private val jwtService: JwtService,
     private val tokenRepository: TokenRepository
 ) {
@@ -34,19 +35,13 @@ class AuthenticationService(
 
         var userOpt = Optional.empty<UserEntity>()
         if (gmail != null) {
-            userOpt = userRepository.findByGmail(gmail)
+            userOpt = profileService.getUser(gmail)
         }
 
         val user = if (userOpt.isPresent) {
             userOpt.get()
         } else {
-            userRepository.save(UserEntity(
-                userUniqueName = null,
-                phone = "",
-                name = name,
-                role = Role.USER,
-                gmail = gmail
-            ))
+            profileService.createUser(null, gmail, name)!!
         }
 
         val jwtToken = jwtService.generateToken(user)
