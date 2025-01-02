@@ -60,4 +60,16 @@ class LocationService(
             latitude = latitude
         )
     }
+
+    fun fakeLocation(latitude: Float, longitude: Float, userId: Long) {
+        val secretKey = getSecretKey()
+        val encLatitude = encryptionService.encrypt(latitude.toString(), secretKey)
+        val encLongitude = encryptionService.encrypt(longitude.toString(), secretKey)
+        val entity = LocationEntity(
+            ownerId = userId,
+            latitude = encLatitude,
+            longitude = encLongitude,
+        )
+        locationRepository.save(entity)
+    }
 }

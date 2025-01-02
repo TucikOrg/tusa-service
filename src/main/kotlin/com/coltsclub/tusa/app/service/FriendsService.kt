@@ -30,13 +30,17 @@ class FriendsService(
     }
 
     fun addFriend(from: Long, requestTo: Long): List<FriendRequestDto> {
+        if (alreadyFriends(from, requestTo)) {
+            return emptyList()
+        }
+
         // Проверяем существует ли заявка в друзья
         val friendRequestOpt = friendRequestRepository.findFriendRequest(from, requestTo)
         if (friendRequestOpt.isPresent) {
             return emptyList()
         }
 
-        // Еслинету то создаем
+        // Если нету то создаем
         friendRequestRepository.save(FriendRequestEntity(from, requestTo))
 
         val users = userRepository.findAllById(listOf(from, requestTo)).toList()
@@ -49,6 +53,35 @@ class FriendsService(
     fun deleteFriend(userId: Long, deleteFriend: Long) {
         friendRepository.deleteByFromUserIdAndToUserId(userId, deleteFriend)
         friendRepository.deleteByFromUserIdAndToUserId(deleteFriend, userId)
+    }
+
+    fun alreadyFriends(userId: Long, secondUserId: Long): Boolean {
+        if (friendRepository.findByFromUserIdAndToUserId(userId, secondUserId).isPresent) {
+            return true
+        }
+        if (friendRepository.findByFromUserIdAndToUserId(secondUserId, userId).isPresent) {
+            return true
+        }
+        return false
+    }
+
+    fun removeRequests(userId: Long, secondUserId: Long) {
+        friendRequestRepository.deleteByFromUserIdAndToUserId(userId, secondUserId)
+        friendRequestRepository.deleteByFromUserIdAndToUserId(secondUserId, userId)
+    }
+
+    @Transactional
+    fun createFriends(userId: Long, secondUserId: Long): List<FriendDto> {
+        if (alreadyFriends(userId, secondUserId)) return listOf()
+        removeRequests(userId, secondUserId)
+
+        val save = listOf(FriendEntity(userId, secondUserId), FriendEntity(secondUserId, userId))
+        val result = friendRepository.saveAll(save)
+        // новые друзья как пользователи
+        val friendUsers = userRepository.findAllById(result.map { it.toUserId }).toList()
+        return friendUsers.map { user ->
+            FriendDto(user.id, user.name?: "", user.userUniqueName)
+        }
     }
 
     fun acceptFriend(userId: Long, requestFrom: Long): List<FriendDto> {

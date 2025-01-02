@@ -3,9 +3,12 @@ package com.coltsclub.tusa.core.socket
 import com.coltsclub.tusa.app.dto.AddUserDto
 import com.coltsclub.tusa.app.dto.AllUsersRequest
 import com.coltsclub.tusa.app.dto.AvatarDTO
+import com.coltsclub.tusa.app.dto.ChangeNameOther
 import com.coltsclub.tusa.app.dto.CreatedUser
+import com.coltsclub.tusa.app.dto.FakeLocation
 import com.coltsclub.tusa.app.dto.User
 import com.coltsclub.tusa.app.dto.UsersPage
+import com.coltsclub.tusa.app.entity.LocationEntity
 import com.coltsclub.tusa.app.service.FriendsService
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.app.service.AvatarService
@@ -19,6 +22,7 @@ import kotlinx.serialization.encodeToByteArray
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.socket.BinaryMessage
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.WebSocketSession
@@ -83,6 +87,48 @@ class WebSocketHandler(
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("all-users", data))
                 session.sendMessage(BinaryMessage(response))
             }
+            "force-friends" -> {
+                val withUserId = Cbor.decodeFromByteArray<Long>(socketMessage.data)
+
+                val friends = friendsService.createFriends(user.id!!, withUserId)
+                if (friends.isEmpty())return
+
+                val forMeData = Cbor.encodeToByteArray(SocketBinaryMessage("accept-friend", Cbor.encodeToByteArray(friends.first { it.id == withUserId })))
+                val forMeResponse = BinaryMessage(forMeData)
+
+                // отправляем мне информацию о том что друг добавлен
+                sessions[user.id]?.forEach { s ->
+                    s.sendMessage(forMeResponse)
+                }
+                val forFriendData = Cbor.encodeToByteArray(SocketBinaryMessage("i-am-accepted", Cbor.encodeToByteArray(friends.first { it.id == user.id })))
+                val forFriendResponse = BinaryMessage(forFriendData)
+
+                // отправляем другу информацию о том что он добавлен
+                sessions[withUserId]?.forEach { s ->
+                    s.sendMessage(forFriendResponse)
+                }
+            }
+            "change-name-other" -> {
+                val changeNameOther = Cbor.decodeFromByteArray<ChangeNameOther>(socketMessage.data)
+                profileService.changeName(changeNameOther.userId, changeNameOther.name)
+            }
+            "change-unique-name-other" -> {
+                val changeNameOther = Cbor.decodeFromByteArray<ChangeNameOther>(socketMessage.data)
+                val success = profileService.changeUniqueName(changeNameOther.userId, changeNameOther.name)
+            }
+            "create-request-to-me" -> {
+                val id = Cbor.decodeFromByteArray<Long>(socketMessage.data)
+                val users = friendsService.addFriend(id, user.id!!)
+                val dataForMe = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("add-friend", Cbor.encodeToByteArray(users.first { it.id == id }))))
+
+                sessions[user.id]?.forEach { s ->
+                    s.sendMessage(dataForMe)
+                }
+            }
+            "fake-location" -> {
+                val fakeLocation = Cbor.decodeFromByteArray<FakeLocation>(socketMessage.data)
+                locationService.fakeLocation(fakeLocation.latitude, fakeLocation.longitude, fakeLocation.userId)
+            }
 
             // user actions
             "friends-avatars" -> {
@@ -146,7 +192,7 @@ class WebSocketHandler(
                 val responseForFriend = BinaryMessage(dataForFriend)
 
                 // отправляем возможному другу информацию о том что ему пришла заявка в друзья
-                sessions[id]!!.forEach { s ->
+                sessions[id]?.forEach { s ->
                     s.sendMessage(responseForFriend)
                 }
             }
@@ -159,7 +205,7 @@ class WebSocketHandler(
                 val forMeResponse = BinaryMessage(forMeData)
 
                 // отправляем мне информацию о том что друг добавлен
-                sessions[user.id]!!.forEach { s ->
+                sessions[user.id]?.forEach { s ->
                     s.sendMessage(forMeResponse)
                 }
 
@@ -167,7 +213,7 @@ class WebSocketHandler(
                 val forFriendResponse = BinaryMessage(forFriendData)
 
                 // отправляем другу информацию о том что он добавлен
-                sessions[id]!!.forEach { s ->
+                sessions[id]?.forEach { s ->
                     s.sendMessage(forFriendResponse)
                 }
             }
@@ -178,14 +224,14 @@ class WebSocketHandler(
                 // отправляем мне информацию о том что друг удален
                 val dataForMe = Cbor.encodeToByteArray(SocketBinaryMessage("delete-friend", Cbor.encodeToByteArray(id)))
                 val responseForMe = BinaryMessage(dataForMe)
-                sessions[user.id]!!.forEach { s ->
+                sessions[user.id]?.forEach { s ->
                     s.sendMessage(responseForMe)
                 }
 
                 // отправляем другу информацию о том что он удален
                 val dataForFriend = Cbor.encodeToByteArray(SocketBinaryMessage("i-was-deleted-from-friends", Cbor.encodeToByteArray(user.id)))
                 val responseForFriend = BinaryMessage(dataForFriend)
-                sessions[id]!!.forEach { s ->
+                sessions[id]?.forEach { s ->
                     s.sendMessage(responseForFriend)
                 }
             }
@@ -204,7 +250,7 @@ class WebSocketHandler(
                 // отправляем мне информацию о том что я удалил заявку в друзья
                 val dataForMe = Cbor.encodeToByteArray(SocketBinaryMessage("delete-request", Cbor.encodeToByteArray(id)))
                 val responseForMe = BinaryMessage(dataForMe)
-                sessions[user.id]!!.forEach { s ->
+                sessions[user.id]?.forEach { s ->
                     s.sendMessage(responseForMe)
                 }
             }
