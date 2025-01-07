@@ -4,25 +4,37 @@ import com.coltsclub.tusa.app.dto.AddUserDto
 import com.coltsclub.tusa.app.dto.AllUsersRequest
 import com.coltsclub.tusa.app.dto.AvatarDTO
 import com.coltsclub.tusa.app.dto.ChangeNameOther
+import com.coltsclub.tusa.app.dto.ChatResponse
+import com.coltsclub.tusa.app.dto.ChatsResponse
 import com.coltsclub.tusa.app.dto.CreatedUser
 import com.coltsclub.tusa.app.dto.FakeLocation
+import com.coltsclub.tusa.app.dto.MessageResponse
+import com.coltsclub.tusa.app.dto.MuteSetResult
+import com.coltsclub.tusa.app.dto.NewChat
+import com.coltsclub.tusa.app.dto.RequestChats
+import com.coltsclub.tusa.app.dto.RequestLastMessages
+import com.coltsclub.tusa.app.dto.RequestMessages
+import com.coltsclub.tusa.app.dto.ResponseMessages
+import com.coltsclub.tusa.app.dto.SendMessage
+import com.coltsclub.tusa.app.dto.SetMuteState
 import com.coltsclub.tusa.app.dto.User
 import com.coltsclub.tusa.app.dto.UsersPage
-import com.coltsclub.tusa.app.entity.LocationEntity
 import com.coltsclub.tusa.app.service.FriendsService
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.app.service.AvatarService
+import com.coltsclub.tusa.app.service.ChatsService
 import com.coltsclub.tusa.app.service.LocationService
+import com.coltsclub.tusa.app.service.MessagesService
 import com.coltsclub.tusa.app.service.ProfileService
+import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
-import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.socket.BinaryMessage
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.WebSocketSession
@@ -34,6 +46,8 @@ class WebSocketHandler(
     private val profileService: ProfileService,
     private val avatarService: AvatarService,
     private val locationService: LocationService,
+    private val chatService: ChatsService,
+    private val messagesService: MessagesService
 ) : BinaryWebSocketHandler() {
     private val sessions = ConcurrentHashMap<Long, MutableList<WebSocketSession>>()
 
@@ -59,6 +73,137 @@ class WebSocketHandler(
         val user = session.user()
         val socketMessage = Cbor.decodeFromByteArray<SocketBinaryMessage>(message.payload.array())
         when (socketMessage.type) {
+            "messages" -> {
+                val requestMessages = Cbor.decodeFromByteArray<RequestMessages>(socketMessage.data)
+                val messages = messagesService.getMessages(requestMessages.chatId,
+                    PageRequest.of(requestMessages.page, requestMessages.size, Sort.by(Sort.Direction.DESC, "creation"))
+                )
+                val responseMessages = messages.map {
+                    MessageResponse(
+                        message = it.message,
+                        ownerId = it.ownerId,
+                        toId = it.toId,
+                        chatId = it.chatId,
+                        payload = it.payload,
+                        creation = it.creation.toInstant(ZoneOffset.UTC).toEpochMilli(),
+                        deletedOwner = it.deletedOwner,
+                        deletedTo = it.deletedTo,
+                        changed = it.changed,
+                        read = it.read
+                    )
+                }
+                val data = Cbor.encodeToByteArray(ResponseMessages(
+                    messages = responseMessages.toList(),
+                    totalPages = messages.totalPages,
+                    chatId = requestMessages.chatId,
+                    page = requestMessages.page
+                ))
+                val response = Cbor.encodeToByteArray(SocketBinaryMessage("messages", data))
+                session.sendMessage(BinaryMessage(response))
+            }
+            "chats" -> {
+                val requestChats = Cbor.decodeFromByteArray<RequestChats>(socketMessage.data)
+                val chats = chatService.getChats(user.id!!, PageRequest.of(requestChats.page, requestChats.size))
+                val chatsResp = chats.map { chat ->
+                    ChatResponse(
+                        chatId = chat.chatId,
+                        ownerId = chat.ownerId,
+                        toId = chat.toId,
+                        lastMessage = chat.lastMessage,
+                        lastMessageOwner = chat.lastMessageOwner,
+                        muted = chat.muted,
+                    )
+                }
+                val dataR = ChatsResponse(
+                    chats = chatsResp.toList(),
+                    totalPages = chats.totalPages,
+                    page = requestChats.page
+                )
+                val data = Cbor.encodeToByteArray(dataR)
+                val response = Cbor.encodeToByteArray(SocketBinaryMessage("chats", data))
+                session.sendMessage(BinaryMessage(response))
+            }
+            "find-chat" -> {
+                val toId = Cbor.decodeFromByteArray<Long>(socketMessage.data)
+                val chat = chatService.findChat(user.id!!, toId)
+                if (chat != null) {
+                    val data = Cbor.encodeToByteArray(ChatResponse(
+                        chatId = chat.chatId,
+                        ownerId = chat.ownerId,
+                        toId = chat.toId,
+                        lastMessage = chat.lastMessage,
+                        lastMessageOwner = chat.lastMessageOwner,
+                        muted = chat.muted
+                    ))
+                    val response = Cbor.encodeToByteArray(SocketBinaryMessage("chat", data))
+                    session.sendMessage(BinaryMessage(response))
+                } else {
+                    val data = Cbor.encodeToByteArray(SocketBinaryMessage("no-chat", Cbor.encodeToByteArray(toId)))
+                    session.sendMessage(BinaryMessage(data))
+                }
+
+            }
+            "send-message" -> {
+                val sendMessage = Cbor.decodeFromByteArray<SendMessage>(socketMessage.data)
+                val result = chatService.sendMessage(sendMessage, user.id!!)
+                if (result.chatsNew) {
+                    for (chat in result.newChats) {
+                        val data = Cbor.encodeToByteArray(NewChat(
+                            chatId = chat.chatId,
+                            ownerId = chat.ownerId,
+                            toId = chat.toId,
+                            lastMessage = chat.lastMessage,
+                            lastMessageOwner = chat.lastMessageOwner
+                        ))
+                        val response = Cbor.encodeToByteArray(SocketBinaryMessage("new-chat", data))
+                        sessions[chat.ownerId]?.forEach {
+                            it.sendMessage(BinaryMessage(response))
+                        }
+                    }
+                }
+
+                val notifyMessage = Cbor.encodeToByteArray(MessageResponse(
+                    message = result.messageEntity.message,
+                    ownerId = result.messageEntity.ownerId,
+                    toId = result.messageEntity.toId,
+                    chatId = result.messageEntity.chatId,
+                    payload = result.messageEntity.payload,
+                    creation = result.messageEntity.creation.toInstant(ZoneOffset.UTC).toEpochMilli(),
+                    deletedOwner = result.messageEntity.deletedOwner,
+                    deletedTo = result.messageEntity.deletedTo,
+                    changed = result.messageEntity.changed,
+                    read = result.messageEntity.read
+                ))
+                val data = Cbor.encodeToByteArray(SocketBinaryMessage("message", notifyMessage))
+                sessions[result.messageEntity.toId]?.forEach { s ->
+                    s.sendMessage(BinaryMessage(data))
+                }
+            }
+            "set-mute-state" -> {
+                val setMuteState = Cbor.decodeFromByteArray<SetMuteState>(socketMessage.data)
+                val chat = chatService.setMuteStateChat(setMuteState, user.id!!)
+                if (chat != null) {
+                    val muteSetResult = MuteSetResult(
+                        chatId = chat.chatId,
+                        state = chat.muted
+                    )
+                    val data = Cbor.encodeToByteArray(SocketBinaryMessage("set-mute-state", Cbor.encodeToByteArray(muteSetResult)))
+                    sessions[chat.ownerId]?.forEach {
+                        it.sendMessage(BinaryMessage(data))
+                    }
+                }
+            }
+            "delete-chat" -> {
+                val chatId = Cbor.decodeFromByteArray<Long>(socketMessage.data)
+                val chat = chatService.deleteChat(chatId, user.id!!)
+                if (chat != null) {
+                    val data = Cbor.encodeToByteArray(SocketBinaryMessage("delete-chat", Cbor.encodeToByteArray(chat.chatId)))
+                    sessions[chat.ownerId]?.forEach {
+                        it.sendMessage(BinaryMessage(data))
+                    }
+                }
+            }
+
             // Admin actions
             "create-user" -> {
                 val newUserData = Cbor.decodeFromByteArray<AddUserDto>(socketMessage.data)
@@ -129,6 +274,7 @@ class WebSocketHandler(
                 val fakeLocation = Cbor.decodeFromByteArray<FakeLocation>(socketMessage.data)
                 locationService.fakeLocation(fakeLocation.latitude, fakeLocation.longitude, fakeLocation.userId)
             }
+
 
             // user actions
             "friends-avatars" -> {
