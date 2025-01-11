@@ -15,7 +15,6 @@ import org.springframework.web.client.RestTemplate
 @Configuration
 class CoreConfiguration(
     private val repository: UserRepository,
-    private val smsCodeAuthenticationProvider: TucikAuthenticationProvider
 ) {
     @Bean
     fun restTemplate(): RestTemplate {
