@@ -42,3 +42,12 @@ jobs:
           context: .
           push: true
           tags: invectys/tucik:latest
+
+      # Deploy the application
+      - name: Deploy
+        run: |
+          cd /opt/tucik
+          docker compose down | true
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          docker compose pull | true
+          docker compose up -d
