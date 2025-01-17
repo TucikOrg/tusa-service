@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class FriendDto(
-    val id: Long?,
+    val id: Long,
     val name: String,
     val uniqueName: String?
 )

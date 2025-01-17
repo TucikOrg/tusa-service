@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class RequestMessages(
-    val chatId: Long,
+    val withUserId: Long,
     val page: Int,
-    val size: Int
+    val size: Int,
 )

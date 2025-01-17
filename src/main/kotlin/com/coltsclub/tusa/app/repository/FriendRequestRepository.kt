@@ -6,21 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 
 interface FriendRequestRepository : JpaRepository<FriendRequestEntity, Long> {
-    @Query(
-        value = """
-          select f from friendRequest f 
-          where f.fromUserId = :fromUserId and f.toUserId = :toUserId
-        """
-    )
-    fun findFriendRequest(fromUserId: Long, toUserId: Long): Optional<FriendRequestEntity>
+    fun findByFirstUserIdAndSecondUserId(firstUserId: Long, secondUserId: Long): FriendRequestEntity?
+    fun findByFirstUserIdOrSecondUserId(firstUserId: Long, secondUserId: Long): List<FriendRequestEntity>
 
-    @Query(
-        value = """
-          select f from friendRequest f 
-          where f.toUserId = :toUserId
-        """
-    )
-    fun findToUserRequests(toUserId: Long): List<FriendRequestEntity>
-
-    fun deleteByFromUserIdAndToUserId(requestFrom: Long, userId: Long)
+    fun deleteByFirstUserIdAndSecondUserId(firstUserId: Long, secondUserId: Long): Int
 }

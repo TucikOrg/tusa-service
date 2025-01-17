@@ -8,16 +8,11 @@ import java.time.LocalDateTime
 
 @Entity(name = "message")
 class MessageEntity(
-    var ownerId: Long,
-    var toId: Long,
-    var chatId: Long,
-    var payload: List<Long>,
+    var firstUserId: Long,
+    var secondUserId: Long,
+    var senderId: Long,
     val message: String,
     val creation: LocalDateTime = LocalDateTime.now(),
-    val deletedOwner: Boolean,
-    val deletedTo: Boolean,
-    val changed: Boolean,
-    val read: Boolean
 ) {
     @Id
     @GeneratedValue(strategy= GenerationType.AUTO)

@@ -4,7 +4,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class FriendRequestDto(
-    val id: Long?,
-    val name: String,
-    val uniqueName: String?
+    val userId: Long,
+    val userName: String,
+    val userUniqueName: String?,
+    val isRequestSender: Boolean
 )

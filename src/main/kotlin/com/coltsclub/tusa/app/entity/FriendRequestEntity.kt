@@ -8,8 +8,13 @@ import java.time.LocalDateTime
 
 @Entity(name = "friendRequest")
 data class FriendRequestEntity(
-    val fromUserId: Long,
-    val toUserId: Long,
+    val firstUserId: Long,
+    val secondUserId: Long,
+    val firstUserName: String,
+    val secondUserName: String,
+    val firstUserUniqueName: String?,
+    val secondUserUniqueName: String?,
+    val actorId: Long,
     val date: LocalDateTime = LocalDateTime.now()
 ) {
     @Id

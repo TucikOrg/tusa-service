@@ -9,7 +9,8 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface ChatRepository: CrudRepository<ChatEntity, Long> {
-    fun findAllByOwnerId(ownerId: Long, pageable: Pageable): Page<ChatEntity>
+    fun findByFirstUserIdOrSecondUserId(firstUserId: Long, secondUserId: Long, pageable: Pageable): Page<ChatEntity>
 
-    fun findByToIdAndOwnerId(toId: Long, ownerId: Long): ChatEntity?
+    @Query("SELECT COUNT(c) FROM chat c WHERE (c.firstUserId = :firstUserId AND c.secondUserId = :secondUserId) OR (c.firstUserId = :secondUserId AND c.secondUserId = :firstUserId)")
+    fun countChats(firstUserId: Long, secondUserId: Long): Long
 }

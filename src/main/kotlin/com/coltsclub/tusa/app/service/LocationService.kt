@@ -29,9 +29,8 @@ class LocationService(
         return secretKey!!
     }
 
-    fun getFriendsLocations(userId: Long, friends: List<Long>): List<LocationDto> {
-        val friendsFiltered = friendsService.filterFriends(userId, friends)
-        val locations = friendsFiltered.map { id ->
+    fun getUsersLocations(userId: Long, usersIds: List<Long>): List<LocationDto> {
+        val locations = usersIds.map { id ->
             val location = locationRepository.findTopByOwnerIdAndByOrderByCreationDesc(id)
             if (location.isEmpty) {
                 return@map null
@@ -50,8 +49,8 @@ class LocationService(
         }
     }
 
-    fun getLastLocation(ownerId: Long): LocationDto {
-        val location = locationRepository.findTopByOwnerIdAndByOrderByCreationDesc(ownerId).getOrNull()?: throw TucikBadRequest("Can't get location")
+    fun getLastLocation(ownerId: Long): LocationDto? {
+        val location = locationRepository.findTopByOwnerIdAndByOrderByCreationDesc(ownerId).getOrNull()?: return null
         val longitude = encryptionService.decrypt(location.longitude, getSecretKey()).toFloat()
         val latitude = encryptionService.decrypt(location.latitude, getSecretKey()).toFloat()
         return LocationDto(

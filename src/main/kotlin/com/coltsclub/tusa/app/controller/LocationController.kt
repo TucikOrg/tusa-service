@@ -5,6 +5,7 @@ import com.coltsclub.tusa.app.entity.LocationEntity
 import com.coltsclub.tusa.app.repository.LocationRepository
 import com.coltsclub.tusa.app.service.LocationService
 import com.coltsclub.tusa.core.service.EncryptionService
+import com.coltsclub.tusa.core.socket.WebSocketHandler
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.PostMapping
@@ -16,7 +17,8 @@ import org.springframework.web.bind.annotation.RestController
 class LocationController(
     val locationRepository: LocationRepository,
     val encryptionService: EncryptionService,
-    val locationService: LocationService
+    val locationService: LocationService,
+    val webSocketHandler: WebSocketHandler
 ) {
     @PostMapping("api/v1/location/add")
     fun addLocation(@RequestBody addLocation: AddLocationDto) {
@@ -30,5 +32,7 @@ class LocationController(
             longitude = encLongitude,
         )
         locationRepository.save(entity)
+
+        webSocketHandler.sendLocationToFriends(userId, addLocation)
     }
 }

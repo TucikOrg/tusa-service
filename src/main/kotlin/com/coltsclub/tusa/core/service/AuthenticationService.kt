@@ -21,9 +21,9 @@ class AuthenticationService(
     private val tokenRepository: TokenRepository
 ) {
     fun authenticate(
-        gmail: String?,
-        pictureUrl: String?,
-        name: String?
+        gmail: String,
+        name: String,
+        pictureUrl: String,
     ): LoginResponseDto {
         // Тут пользователь уже авторизован
         authenticationManager.authenticate(
@@ -34,7 +34,7 @@ class AuthenticationService(
         )
 
         var userOpt = Optional.empty<UserEntity>()
-        if (gmail != null) {
+        if (gmail.isNotEmpty()) {
             userOpt = profileService.getUser(gmail)
         }
 
@@ -52,8 +52,8 @@ class AuthenticationService(
             name = user.name?: "",
             jwt = jwtToken,
             id = user.id!!,
-            phone = user.phone?: "",
-            gmail = user.gmail?: "",
+            phone = user.phone,
+            gmail = user.gmail,
             pictureUrl = pictureUrl?: ""
         )
     }

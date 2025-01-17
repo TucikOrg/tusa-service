@@ -42,7 +42,7 @@ class ProfileService(
         return true
     }
 
-    fun createUser(uniqueName: String?, gmail: String?, name: String?): UserEntity? {
+    fun createUser(uniqueName: String?, gmail: String, name: String): UserEntity? {
         if (uniqueName != null && !isUserUniqueNameAvailable(uniqueName)) return null
 
         return userRepository.save(

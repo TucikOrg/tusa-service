@@ -8,13 +8,12 @@ import jakarta.persistence.Id
 
 @Entity(name = "chat")
 class ChatEntity(
-    var ownerId: Long,
-    val toId: Long,
-    var muted: Boolean,
-    val chatId: Long,
-    var lastMessage: String,
-    var lastMessageOwner: Long,
-    var deleted: Boolean = false
+    var firstUserId: Long,
+    val secondUserId: Long,
+    val firsUserName: String,
+    val secondUserName: String,
+    val firstUserUniqueName: String?,
+    val secondUserUniqueName: String?,
 ) {
     @Id
     @GeneratedValue(strategy= GenerationType.AUTO)

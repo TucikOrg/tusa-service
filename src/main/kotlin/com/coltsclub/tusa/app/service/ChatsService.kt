@@ -1,101 +1,137 @@
 package com.coltsclub.tusa.app.service
 
-import com.coltsclub.tusa.app.dto.SendMessage
+import com.coltsclub.tusa.app.dto.ChatResponse
 import com.coltsclub.tusa.app.dto.SendMessageResult
-import com.coltsclub.tusa.app.dto.SetMuteState
+import com.coltsclub.tusa.app.dto.messenger.ChatAction
 import com.coltsclub.tusa.app.entity.ChatEntity
+import com.coltsclub.tusa.app.entity.ChatsActionType
+import com.coltsclub.tusa.app.entity.ChatsActionsEntity
 import com.coltsclub.tusa.app.entity.MessageEntity
+import com.coltsclub.tusa.app.entity.MessagesActionType
+import com.coltsclub.tusa.app.entity.MessagesActionsEntity
 import com.coltsclub.tusa.app.repository.ChatRepository
+import com.coltsclub.tusa.app.repository.ChatsActionsRepository
 import com.coltsclub.tusa.app.repository.MessageRepository
+import com.coltsclub.tusa.app.repository.MessagesActionsRepository
+import com.coltsclub.tusa.core.AlineTwoLongsIds
+import com.coltsclub.tusa.core.repository.UserRepository
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 
 @Service
 class ChatsService(
+    private val chatsActionsRepository: ChatsActionsRepository,
+    private val messagesActionsRepository: MessagesActionsRepository,
     private val chatsRepository: ChatRepository,
-    private val messageRepository: MessageRepository
+    private val messageRepository: MessageRepository,
+    private val userRepository: UserRepository
 ) {
-    fun setMuteStateChat(setMuteState: SetMuteState, owner: Long): ChatEntity? {
-        val chat = chatsRepository.findByToIdAndOwnerId(toId = setMuteState.toId, ownerId = owner) ?: return null
-        chat.muted = setMuteState.state
-        return chatsRepository.save(chat)
-    }
+    fun sendMessage(userId: Long, toUserId: Long, message: String): SendMessageResult {
+        var chatCreated = false
+        val ids = AlineTwoLongsIds.aline(userId, toUserId)
+        val firstId = ids.first
+        val secondId = ids.second
 
-    fun deleteChat(toId: Long, owner: Long): ChatEntity? {
-        val chat = chatsRepository.findByToIdAndOwnerId(toId = toId, ownerId = owner) ?: return null
-        if (chat.ownerId != owner) return null
-        return chatsRepository.save(chat.apply {
-            deleted = true
-        })
-    }
-
-    fun sendMessage(sendMessage: SendMessage, owner: Long): SendMessageResult {
-        var chats = emptyList<ChatEntity>()
-        var chatsNew = false
-        val chatOne = chatsRepository.findByToIdAndOwnerId(toId = sendMessage.toId, ownerId = owner)
-        if (chatOne == null) {
-            chatsNew = true
-            chats = initiateNewCommunication(owner, sendMessage.toId, sendMessage.message)
-        } else {
-            val chatSecond = chatsRepository.findByToIdAndOwnerId(toId = owner, ownerId = sendMessage.toId)!!
-            chats = listOf(chatOne, chatSecond)
-        }
-
-        val result = messageRepository.save(
+        // сохраняем сообщение
+        val savedMessage = messageRepository.save(
             MessageEntity(
-                ownerId = owner,
-                toId = sendMessage.toId,
-                payload = sendMessage.payload,
-                deletedOwner = false,
-                deletedTo = false,
-                changed = false,
-                read = false,
-                chatId = chats.first().chatId,
-                message = sendMessage.message
+                firstUserId = firstId,
+                secondUserId = secondId,
+                senderId = userId,
+                message = message
             )
         )
 
-        for (chatEl in chats) {
-            chatEl.lastMessage = sendMessage.message
-            chatEl.lastMessageOwner = owner
-            chatsRepository.save(chatEl)
+        // сохраняем действие о отправке сообщения
+        messagesActionsRepository.save(
+            MessagesActionsEntity(
+                messageId = savedMessage.id!!,
+                actionType = MessagesActionType.ADD,
+                actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC),
+                firstUserId = firstId,
+                secondUserId = secondId,
+                senderId = userId,
+                message = message
+            )
+        )
+
+
+        // проверяем наличие чата
+        val chatExist = chatsRepository.countChats(userId, toUserId) > 0
+        if (!chatExist) {
+            val firstUser = userRepository.findById(firstId).get()
+            val secondUser = userRepository.findById(secondId).get()
+
+            // создаем чат
+            val savedChat = chatsRepository.save(
+                ChatEntity(
+                    firstUserId = firstId,
+                    secondUserId = secondId,
+                    firsUserName = firstUser.name,
+                    secondUserName = secondUser.name,
+                    firstUserUniqueName = firstUser.userUniqueName,
+                    secondUserUniqueName = secondUser.userUniqueName
+                )
+            )
+
+            // добавляем действие о создании нового чата
+            chatsActionsRepository.save(
+                ChatsActionsEntity(
+                    chatId = savedChat.id!!,
+                    actionType = ChatsActionType.ADD,
+                    actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC),
+                    firstUserId = firstId,
+                    secondUserId = secondId,
+                    firsUserName = savedChat.firsUserName,
+                    secondUserName = savedChat.secondUserName,
+                    firstUserUniqueName = savedChat.firstUserUniqueName,
+                    secondUserUniqueName = savedChat.secondUserUniqueName
+                )
+            )
+            chatCreated = true
         }
 
-        return SendMessageResult(
-            chatsNew = chatsNew,
-            newChats = chats,
-            messageEntity = result
-        )
+        return SendMessageResult(chatCreated)
     }
 
-    fun initiateNewCommunication(senderMessageId: Long, receiverId: Long, message: String): List<ChatEntity> {
-        val chatId = (messageRepository.findMaxChatId()?: 0) + 1
-        val chatFirst = ChatEntity(
-            ownerId = senderMessageId,
-            toId = receiverId,
-            muted = false,
-            chatId = chatId,
-            lastMessage = message,
-            lastMessageOwner = senderMessageId
-        )
-        val chatSecond = ChatEntity(
-            ownerId = receiverId,
-            toId = senderMessageId,
-            muted = false,
-            chatId = chatId,
-            lastMessage = message,
-            lastMessageOwner = senderMessageId
-        )
-        val result = chatsRepository.saveAll(listOf(chatFirst, chatSecond)).toList()
-        return result
+    fun getChats(userId: Long, pageable: Pageable): Page<ChatEntity> {
+        return chatsRepository.findByFirstUserIdOrSecondUserId(userId, userId, pageable)
     }
 
-    fun findChat(id: Long, toId: Long): ChatEntity? {
-        return chatsRepository.findByToIdAndOwnerId(toId = toId, ownerId = id)
+    fun getActions(userId: Long, actionTime: Long): List<ChatAction> {
+        val actions = chatsActionsRepository.findAllByFirstUserIdOrSecondUserIdAndActionTimeGreaterThan(userId, userId, actionTime)
+        return actions.map {
+            ChatAction(
+                chat = ChatResponse(
+                    id = it.chatId,
+                    firstUserId = it.firstUserId,
+                    secondUserId = it.secondUserId,
+                    firsUserName = it.firsUserName,
+                    secondUserName = it.secondUserName,
+                    firstUserUniqueName = it.firstUserUniqueName,
+                    secondUserUniqueName = it.secondUserUniqueName
+                ),
+                actionType = it.actionType,
+                actionTime = it.actionTime
+            )
+        }
     }
 
-    fun getChats(ownerId: Long, pageable: Pageable): Page<ChatEntity> {
-        return chatsRepository.findAllByOwnerId(ownerId, pageable)
+    fun getInitChats(id: Long, size: Int): List<ChatResponse> {
+        val chats = chatsRepository.findByFirstUserIdOrSecondUserId(id, id, Pageable.unpaged())
+        return chats.map {
+            ChatResponse(
+                id = it.id!!,
+                firstUserId = it.firstUserId,
+                secondUserId = it.secondUserId,
+                firsUserName = it.firsUserName,
+                secondUserName = it.secondUserName,
+                firstUserUniqueName = it.firstUserUniqueName,
+                secondUserUniqueName = it.secondUserUniqueName
+            )
+        }.toList()
     }
 }

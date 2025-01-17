@@ -6,6 +6,5 @@ import kotlinx.serialization.Serializable
 data class ResponseMessages(
     val messages: List<MessageResponse>,
     val totalPages: Int,
-    val chatId: Long,
     val page: Int
 )
