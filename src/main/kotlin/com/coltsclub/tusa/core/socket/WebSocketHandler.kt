@@ -119,11 +119,11 @@ class WebSocketHandler(
 
     @OptIn(ExperimentalSerializationApi::class)
     override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {
+        val socketMessage = Cbor.decodeFromByteArray<SocketBinaryMessage>(message.payload.array())
         val user = try {session.user()} catch (e: Exception) {
             logger.error("(handleBinaryMessage) User not found")
             return
         }
-        val socketMessage = Cbor.decodeFromByteArray<SocketBinaryMessage>(message.payload.array())
 
         // Тусик мессенджер
         // обработка сообщений
@@ -221,6 +221,4 @@ class WebSocketHandler(
     fun WebSocketSession.user(): UserEntity {
         return (this.principal as UsernamePasswordAuthenticationToken).principal as UserEntity
     }
-
-
 }
