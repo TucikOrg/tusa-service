@@ -7,6 +7,8 @@ import com.coltsclub.tusa.app.repository.AvatarActionsRepository
 import com.coltsclub.tusa.app.repository.AvatarRepository
 import com.coltsclub.tusa.core.exceptions.TucikBadRequest
 import com.coltsclub.tusa.core.socket.WebSocketHandler
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.PathVariable
@@ -51,7 +53,7 @@ class AvatarController(
             AvatarActionsEntity(
                 ownerId = userId,
                 actionType = AvatarActionType.CHANGE,
-                actionTime = System.currentTimeMillis()
+                actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
             )
         )
 

@@ -13,4 +13,6 @@ interface ChatRepository: CrudRepository<ChatEntity, Long> {
 
     @Query("SELECT COUNT(c) FROM chat c WHERE (c.firstUserId = :firstUserId AND c.secondUserId = :secondUserId) OR (c.firstUserId = :secondUserId AND c.secondUserId = :firstUserId)")
     fun countChats(firstUserId: Long, secondUserId: Long): Long
+    fun deleteByFirstUserIdAndSecondUserId(firstId: Long, secondId: Long)
+    fun findByFirstUserIdAndSecondUserId(firstId: Long, secondId: Long): ChatEntity?
 }

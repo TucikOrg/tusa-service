@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class MessageResponse(
     var id: Long? = null,
+    var temporaryId: String,
     var firstUserId: Long,
     var secondUserId: Long,
     var senderId: Long,

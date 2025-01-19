@@ -19,9 +19,11 @@ interface MessageRepository: CrudRepository<MessageEntity, Long> {
             FROM message
             WHERE :userId IN (first_user_id, second_user_id)
         ) subquery
-        WHERE row_num <= 50
+        WHERE row_num <= :size
         """,
         nativeQuery = true
     )
-    fun findTop50PerUserGroup(@Param("userId") userId: Long): List<MessageEntity>
+    fun findTopPerUserGroup(@Param("userId") userId: Long, @Param("size") size: Int): List<MessageEntity>
+
+    fun deleteByFirstUserIdAndSecondUserId(firstId: Long, secondId: Long)
 }

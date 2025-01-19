@@ -33,13 +33,6 @@ class JwtService {
         extraClaims: Map<String, Any>,
         userDetails: UserDetails
     ): String {
-        return buildToken(extraClaims, userDetails)
-    }
-
-    private fun buildToken(
-        extraClaims: Map<String, Any>,
-        userDetails: UserDetails
-    ): String {
         return Jwts
             .builder()
             .setClaims(extraClaims)

@@ -8,5 +8,5 @@ import kotlinx.serialization.Serializable
 data class MessagesAction(
     val message: MessageResponse,
     val actionType: MessagesActionType,
-    val actionTime: Long
+    val actionTime: Long,
 )

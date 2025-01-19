@@ -2,36 +2,18 @@ package com.coltsclub.tusa.core.socket
 
 import com.coltsclub.tusa.app.handlers.ChatBinaryHandler
 import com.coltsclub.tusa.app.dto.AddLocationDto
-import com.coltsclub.tusa.app.dto.AddUserDto
-import com.coltsclub.tusa.app.dto.AllUsersRequest
 import com.coltsclub.tusa.app.dto.AvatarAction
 import com.coltsclub.tusa.app.dto.AvatarDTO
-import com.coltsclub.tusa.app.dto.ChangeNameOther
-import com.coltsclub.tusa.app.dto.CreatedUser
-import com.coltsclub.tusa.app.dto.FakeLocation
-import com.coltsclub.tusa.app.dto.FriendActionDto
-import com.coltsclub.tusa.app.dto.FriendDto
-import com.coltsclub.tusa.app.dto.FriendRequestActionDto
-import com.coltsclub.tusa.app.dto.FriendRequestDto
-import com.coltsclub.tusa.app.dto.FriendsInitializationState
-import com.coltsclub.tusa.app.dto.FriendsRequestsInitializationState
-import com.coltsclub.tusa.app.dto.UpdateLocationDto
-import com.coltsclub.tusa.app.dto.User
-import com.coltsclub.tusa.app.dto.UsersPage
+import com.coltsclub.tusa.app.dto.IsOnlineDto
 import com.coltsclub.tusa.app.handlers.AdminBinaryHandler
 import com.coltsclub.tusa.app.handlers.FriendsBinaryHandler
 import com.coltsclub.tusa.app.handlers.full.FriendsHandlerFull
 import com.coltsclub.tusa.app.repository.AvatarActionsRepository
-import com.coltsclub.tusa.app.repository.FriendsActionsRepository
-import com.coltsclub.tusa.app.repository.FriendsRequestsActionsRepository
 import com.coltsclub.tusa.app.service.FriendsService
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.app.service.AvatarService
-import com.coltsclub.tusa.app.service.ChatsService
 import com.coltsclub.tusa.app.service.LocationService
-import com.coltsclub.tusa.app.service.MessagesService
 import com.coltsclub.tusa.app.service.ProfileService
-import com.coltsclub.tusa.core.repository.UserRepository
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentHashMap
@@ -39,7 +21,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
-import org.springframework.data.domain.PageRequest
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.BinaryMessage
@@ -61,6 +42,7 @@ class WebSocketHandler(
     private val avatarsActionsRepository: AvatarActionsRepository
 ) : BinaryWebSocketHandler() {
     private val sessions = ConcurrentHashMap<Long, MutableList<WebSocketSession>>()
+    private val closingSessions = ConcurrentHashMap<String, Unit>()
     private val logger = org.slf4j.LoggerFactory.getLogger(WebSocketHandler::class.java)
 
     init {
@@ -78,27 +60,57 @@ class WebSocketHandler(
         }
     }
 
-    override fun afterConnectionEstablished(session: WebSocketSession) {
-        val user = try {session.user()} catch (e: Exception) {
-            logger.error("(afterConnectionEstablished) User not found")
-            return
-        }
-        val sessionList = sessions[user.id!!]
-        if (sessionList == null) {
-            sessions[user.id] = mutableListOf(session)
-        } else {
-            sessionList.add(session)
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun getUserOrClose(session: WebSocketSession): UserEntity? {
+        return try {session.user()} catch (e: Exception) {
+            logger.error("Invalid token. Closing.")
+            if (closingSessions.containsKey(session.id)) {
+                // уже закрываем эту сессию
+                return null
+            }
+            closingSessions[session.id] = Unit
+            val response = Cbor.encodeToByteArray(SocketBinaryMessage("closed", Cbor.encodeToByteArray("Token invalid!")))
+            session.sendMessage(BinaryMessage(response))
+            return null
         }
     }
 
+    override fun afterConnectionEstablished(session: WebSocketSession) {
+        val user = getUserOrClose(session) ?: return
+
+        removeClosedSessionsOfUser(user.id!!)
+        var sessionList = sessions[user.id]
+        if (sessionList == null) {
+            sessionList =  mutableListOf(session)
+            sessions[user.id] = sessionList
+        } else {
+            sessionList.add(session)
+        }
+
+        val remainsUserSessions = sessionList.size
+        logger.info("Connection established. User: ${user.id}. Sessions: $remainsUserSessions")
+    }
+
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
+        closingSessions.remove(session.id)
         val user = try {session.user()} catch (e: Exception) {
-            logger.error("(afterConnectionClosed) User not found")
+            logger.error("Connection closed. Code: ${status.code}")
+
+            // Ищем сессию проходя по всем сессиям
+            // Потому что найти ее быстро по пользователю не получится
+            sessions.forEach { (userId, sessionList) ->
+                sessionList.remove(session)
+            }
+
             return
         }
 
+        // Удаляем сессию из списка сессий пользователя
         val sessionList = sessions[user.id!!]
         sessionList?.remove(session)
+        val remainSessions = sessionList?.size?: -1
+
+        logger.info("Connection closed. User: ${user.id}. Remains user sessions: $remainSessions")
     }
 
     fun sendLocationToFriends(userId: Long, addLocationDto: AddLocationDto) {
@@ -111,7 +123,7 @@ class WebSocketHandler(
         val ids = friends.map { it.id }
         ids.forEach { friendId ->
             val refreshAvatars = Cbor.encodeToByteArray(SocketBinaryMessage("refresh-avatars", Cbor.encodeToByteArray(
-                byteArrayOf()
+                LocalDateTime.now().toEpochSecond(ZoneOffset.UTC) // отправляем серверное текущее время для сохранения временной точки синхронизации
             )))
             sendToSessionsOf(friendId, BinaryMessage(refreshAvatars))
         }
@@ -120,10 +132,7 @@ class WebSocketHandler(
     @OptIn(ExperimentalSerializationApi::class)
     override fun handleBinaryMessage(session: WebSocketSession, message: BinaryMessage) {
         val socketMessage = Cbor.decodeFromByteArray<SocketBinaryMessage>(message.payload.array())
-        val user = try {session.user()} catch (e: Exception) {
-            logger.error("(handleBinaryMessage) User not found")
-            return
-        }
+        val user = getUserOrClose(session) ?: return
 
         // Тусик мессенджер
         // обработка сообщений
@@ -150,7 +159,14 @@ class WebSocketHandler(
 
 
         when (socketMessage.type) {
-            // user actions
+            "is-online" -> {
+                val id = Cbor.decodeFromByteArray<Long>(socketMessage.data)
+                val isOnline = sessions[id]?.isNotEmpty() ?: false
+                val response = Cbor.encodeToByteArray(SocketBinaryMessage("is-online",
+                    Cbor.encodeToByteArray(IsOnlineDto(userId = id, isOnline = isOnline)))
+                )
+                session.sendMessage(BinaryMessage(response))
+            }
             "locations" -> {
                 // хочу получить локации друзей
                 val friends = friendsService.getFriends(user.id!!)
@@ -214,8 +230,15 @@ class WebSocketHandler(
         sessionList?.forEach { session ->
             if (session.isOpen) {
                 session.sendMessage(binaryMessage)
+            } else {
+                sessionList.remove(session)
             }
         }
+    }
+
+    fun removeClosedSessionsOfUser(userId: Long) {
+        val sessionList = sessions[userId]
+        sessionList?.removeIf { !it.isOpen }
     }
 
     fun WebSocketSession.user(): UserEntity {

@@ -13,6 +13,7 @@ data class MessagesActionsEntity(
     val secondUserId: Long,
     val senderId: Long,
     val message: String,
+    val messageTemporaryId: String,
     val messageCreation: LocalDateTime = LocalDateTime.now(),
     val actionType: MessagesActionType,
     val actionTime: Long

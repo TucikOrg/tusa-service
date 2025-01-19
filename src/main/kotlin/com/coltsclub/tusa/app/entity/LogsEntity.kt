@@ -6,17 +6,15 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import java.time.LocalDateTime
-import org.checkerframework.common.aliasing.qual.Unique
 
-@Entity(name = "message")
-class MessageEntity(
-    var firstUserId: Long,
-    var secondUserId: Long,
-    var senderId: Long,
+@Entity(name = "logs")
+class LogsEntity(
     val message: String,
-    @Column(unique = true)
-    val temporaryId: String,
-    val creation: LocalDateTime = LocalDateTime.now(),
+    @Column(length = 10000)
+    val stackTrace: String,
+    val thread: String,
+    val userId: Long,
+    val creation: LocalDateTime = LocalDateTime.now()
 ) {
     @Id
     @GeneratedValue(strategy= GenerationType.AUTO)

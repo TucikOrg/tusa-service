@@ -10,6 +10,7 @@ import com.coltsclub.tusa.app.dto.SendMessage
 import com.coltsclub.tusa.app.dto.messenger.InitChatsResponse
 import com.coltsclub.tusa.app.dto.messenger.InitMessenger
 import com.coltsclub.tusa.app.dto.messenger.InitMessagesResponse
+import com.coltsclub.tusa.app.exceptions.ChatUserDeletedException
 import com.coltsclub.tusa.app.service.ChatsService
 import com.coltsclub.tusa.app.service.MessagesService
 import com.coltsclub.tusa.core.entity.UserEntity
@@ -112,7 +113,8 @@ class ChatBinaryHandler(
                         secondUserId = it.secondUserId,
                         senderId = it.senderId,
                         message = it.message,
-                        creation = it.creation.toInstant(ZoneOffset.UTC).toEpochMilli(),
+                        creation = it.creation.toEpochSecond(ZoneOffset.UTC),
+                        temporaryId = it.temporaryId
                     )
                 }
                 val data = Cbor.encodeToByteArray(
@@ -158,22 +160,33 @@ class ChatBinaryHandler(
             "send-message" -> {
                 // отправляем сообщение
                 val sendMessage = Cbor.decodeFromByteArray<SendMessage>(socketMessage.data)
-                val result = chatService.sendMessage(
-                    userId = user.id!!,
-                    toUserId = sendMessage.toId,
-                    message = sendMessage.message
-                )
+                try {
+                    val result = chatService.sendMessage(
+                        userId = user.id!!,
+                        toUserId = sendMessage.toId,
+                        message = sendMessage.message,
+                        tempId = sendMessage.temporaryId
+                    )
 
-                // уведомляем пользователя о новом сообщении
-                // и уведомляем отправителя что сообщение было доставлено
-                val refreshMessages = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-messages", byteArrayOf())))
-                sendToSessionsOf(sendMessage.toId, refreshMessages)
-                sendToSessionsOf(user.id, refreshMessages)
+                    // уведомляем пользователя о новом сообщении
+                    // и уведомляем отправителя что сообщение было доставлено
+                    val refreshMessages = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-messages", byteArrayOf())))
+                    sendToSessionsOf(sendMessage.toId, refreshMessages)
+                    sendToSessionsOf(user.id, refreshMessages)
 
-                // если чат был создан то уведомляем о том что нужно обновить состояние чатов
-                if (result.chatCreated) {
+                    // если чат был создан то уведомляем о том что нужно обновить состояние чатов
+                    if (result.chatCreated) {
+                        val refreshChats = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-chats", byteArrayOf())))
+                        sendToSessionsOf(sendMessage.toId, refreshChats)
+                        sendToSessionsOf(user.id, refreshChats)
+                    }
+                } catch (e: ChatUserDeletedException) {
+                    // если например пользователь удален, а у первого остался чат то вылезет исключение
+                    // полностью в базе зачищаем чат
+                    chatService.fullClearChatAndMessages(user.id!!, sendMessage.toId)
+
+                    // сообщаем тому кто пытался отправить сообщение что чат был зачищен
                     val refreshChats = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-chats", byteArrayOf())))
-                    sendToSessionsOf(sendMessage.toId, refreshChats)
                     sendToSessionsOf(user.id, refreshChats)
                 }
             }

@@ -6,4 +6,5 @@ import org.springframework.data.repository.CrudRepository
 
 interface ChatsActionsRepository : CrudRepository<ChatsActionsEntity, Long> {
     fun findAllByFirstUserIdOrSecondUserIdAndActionTimeGreaterThan(firstUserId: Long, secondUserId: Long, actionTime: Long): List<ChatsActionsEntity>
+    fun deleteAllByFirstUserIdAndSecondUserId(firstId: Long, secondId: Long)
 }

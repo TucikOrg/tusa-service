@@ -6,5 +6,6 @@ import kotlinx.serialization.Serializable
 data class SendMessage(
     val toId: Long,
     val message: String,
+    val temporaryId: String,
     val payload: List<Long>
 )

@@ -17,14 +17,15 @@ class MessagesService(
     private val messagesActionsRepository: MessagesActionsRepository
 ) {
     fun getInitMessages(userId: Long, size: Int): List<MessageResponse> {
-        return messageRepository.findTop50PerUserGroup(userId).map {
+        return messageRepository.findTopPerUserGroup(userId, size).map {
             MessageResponse(
                 id = it.id!!,
                 firstUserId = it.firstUserId,
                 secondUserId = it.secondUserId,
                 message = it.message,
                 creation = it.creation.toEpochSecond(ZoneOffset.UTC),
-                senderId = it.senderId
+                senderId = it.senderId,
+                temporaryId = it.temporaryId
             )
         }
     }
@@ -46,7 +47,8 @@ class MessagesService(
                     secondUserId = it.secondUserId,
                     message = it.message,
                     creation = it.messageCreation.toEpochSecond(ZoneOffset.UTC),
-                    senderId = it.senderId
+                    senderId = it.senderId,
+                    temporaryId = it.messageTemporaryId
                 ),
                 actionType = it.actionType,
                 actionTime = it.actionTime

@@ -5,8 +5,6 @@ import com.coltsclub.tusa.core.service.JwtService
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.core.userdetails.UserDetails
@@ -22,7 +20,6 @@ class JwtAuthenticationFilter(
     private val userDetailsService: UserDetailsService,
     private val tokenRepository: TokenRepository
 ) : OncePerRequestFilter() {
-    private val logger: Logger = LoggerFactory.getLogger(JwtAuthenticationFilter::class.java)
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -61,6 +58,7 @@ class JwtAuthenticationFilter(
                     SecurityContextHolder.getContext().authentication = authToken
                 }
             }
+
         } catch (usernameNotFoundException: UsernameNotFoundException) {
             logger.info("User not found")
         } catch (exception: Exception) {
