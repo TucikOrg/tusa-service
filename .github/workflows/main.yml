@@ -14,7 +14,7 @@ jobs:
 
       - name: Build
         run: |
-          export JAVA_HOME=/root/.sdkman/candidates/java/current/bin
+          export JAVA_HOME=/root/.sdkman/candidates/java/current
           chmod +x gradlew
           ./gradlew assemble
           mv build/libs/tusa-0.0.1-SNAPSHOT.jar /root/tucik/backend/tucik-backend.jar
