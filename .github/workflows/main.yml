@@ -18,3 +18,4 @@ jobs:
           chmod +x gradlew
           ./gradlew assemble
           mv build/libs/tusa-0.0.1-SNAPSHOT.jar /root/tucik/backend/tucik-backend.jar
+          systemctl restart tucik-backend
