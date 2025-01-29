@@ -4,21 +4,17 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
-  update-meta:
+  build:
     runs-on: self-hosted
-
     steps:
       # Check out the repository code
       - uses: actions/checkout@v4
 
       - name: Build
         run: |
-          export JAVA_HOME=/root/.sdkman/candidates/java/current/bin/java
+          export JAVA_HOME=/root/.sdkman/candidates/java/current/bin
           chmod +x gradlew
           ./gradlew assemble
           mv build/libs/tusa-0.0.1-SNAPSHOT.jar /root/tucik/backend/tucik-backend.jar
