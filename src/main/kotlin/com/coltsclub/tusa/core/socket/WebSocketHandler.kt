@@ -229,15 +229,18 @@ class WebSocketHandler(
         }
     }
 
-    fun sendToSessionsOf(userId: Long, binaryMessage: BinaryMessage) {
+    fun sendToSessionsOf(userId: Long, binaryMessage: BinaryMessage): Int {
         val sessionList = sessions[userId]
+        var sentCount = 0
         sessionList?.forEach { session ->
             if (session.isOpen) {
+                sentCount++
                 session.sendMessage(binaryMessage)
             } else {
                 sessionList.remove(session)
             }
         }
+        return sentCount
     }
 
     fun removeClosedSessionsOfUser(userId: Long) {

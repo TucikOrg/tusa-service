@@ -14,6 +14,7 @@ import com.coltsclub.tusa.app.exceptions.ChatUserDeletedException
 import com.coltsclub.tusa.app.service.ChatsService
 import com.coltsclub.tusa.app.service.MessagesService
 import com.coltsclub.tusa.core.entity.UserEntity
+import com.coltsclub.tusa.core.service.PushNotificationService
 import com.coltsclub.tusa.core.socket.SocketBinaryMessage
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -30,9 +31,10 @@ import org.springframework.web.socket.WebSocketSession
 @Service
 class ChatBinaryHandler(
     private val messagesService: MessagesService,
-    private val chatService: ChatsService
+    private val chatService: ChatsService,
+    private val pushNotificationService: PushNotificationService
 ) {
-    lateinit var sendToSessionsOf: (Long, BinaryMessage) -> Unit
+    lateinit var sendToSessionsOf: (Long, BinaryMessage) -> Int
 
     @OptIn(ExperimentalSerializationApi::class)
     fun handleBinaryMessage(
@@ -171,8 +173,17 @@ class ChatBinaryHandler(
                     // уведомляем пользователя о новом сообщении
                     // и уведомляем отправителя что сообщение было доставлено
                     val refreshMessages = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-messages", byteArrayOf())))
-                    sendToSessionsOf(sendMessage.toId, refreshMessages)
                     sendToSessionsOf(user.id, refreshMessages)
+                    val countOfSessions = sendToSessionsOf(sendMessage.toId, refreshMessages)
+                    if (countOfSessions == 0) {
+                        // если друг не онлайн то отправляем уведомление
+                        // он его получит оффлайн
+                        pushNotificationService.sendNewMessageNotification(
+                            toUserId = sendMessage.toId,
+                            fromUserId = user.id,
+                            message = sendMessage.message
+                        )
+                    }
 
                     // если чат был создан то уведомляем о том что нужно обновить состояние чатов
                     if (result.chatCreated) {
