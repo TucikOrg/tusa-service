@@ -73,3 +73,6 @@ spring.log
 
 # Ignore test reports
 /test-results/
+
+tucik-e0058-firebase-adminsdk-fbsvc-930035d462.json
+application.properties

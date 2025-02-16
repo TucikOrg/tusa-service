@@ -5,6 +5,7 @@ import com.coltsclub.tusa.core.enums.Role
 import com.coltsclub.tusa.core.exceptions.TucikBadRequest
 import com.coltsclub.tusa.core.repository.UserRepository
 import java.util.Optional
+import kotlin.jvm.optionals.getOrNull
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
@@ -51,8 +52,15 @@ class ProfileService(
                 phone = "",
                 name = name,
                 role = Role.USER,
-                gmail = gmail
+                gmail = gmail,
+                firebaseToken = ""
             )
         )
+    }
+
+    fun saveFirebaseToken(id: Long, token: String) {
+        val user = userRepository.findById(id).getOrNull()?: return
+        user.firebaseToken = token
+        userRepository.save(user)
     }
 }

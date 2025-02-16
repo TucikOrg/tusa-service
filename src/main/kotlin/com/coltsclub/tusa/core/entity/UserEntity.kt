@@ -16,7 +16,8 @@ data class UserEntity(
     val phone: String,
     var name: String,
     @Enumerated(EnumType.STRING) val role: Role,
-    var gmail: String
+    var gmail: String,
+    var firebaseToken: String
 ) : UserDetails {
     @Id
     @GeneratedValue

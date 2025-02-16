@@ -159,6 +159,10 @@ class WebSocketHandler(
 
 
         when (socketMessage.type) {
+            "firebase-token" -> {
+                val token = Cbor.decodeFromByteArray<String>(socketMessage.data)
+                profileService.saveFirebaseToken(user.id!!, token)
+            }
             "is-online" -> {
                 val id = Cbor.decodeFromByteArray<Long>(socketMessage.data)
                 val isOnline = sessions[id]?.isNotEmpty() ?: false

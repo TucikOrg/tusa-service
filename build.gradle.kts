@@ -35,6 +35,7 @@ dependencies {
 	implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.7.3")
 	implementation("com.google.api-client:google-api-client:2.4.0")
 	implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
+	implementation("com.google.firebase:firebase-admin:9.4.3")
 
 	runtimeOnly("org.postgresql:postgresql")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
