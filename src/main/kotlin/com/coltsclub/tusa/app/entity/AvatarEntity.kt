@@ -5,12 +5,13 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 @Entity(name = "avatar")
 class AvatarEntity(
     var ownerId: Long,
     val avatar: ByteArray,
-    val creation: LocalDateTime = LocalDateTime.now()
+    val creation: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC)
 ) {
     @Id
     @GeneratedValue(strategy= GenerationType.AUTO)

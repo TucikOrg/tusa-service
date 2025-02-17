@@ -30,7 +30,7 @@ class AdminBinaryHandler(
     private val locationsService: LocationService,
     private val friendsHandlerFull: FriendsHandlerFull
 ) {
-    lateinit var sendToSessionsOf: (Long, BinaryMessage) -> Unit
+    lateinit var sendToSessionsOf: (Long, BinaryMessage) -> Int
 
     init {
         friendsHandlerFull.sendToSessionsOf = { userId, message ->
@@ -79,11 +79,13 @@ class AdminBinaryHandler(
             }
             "change-name-other" -> {
                 val changeNameOther = Cbor.decodeFromByteArray<ChangeNameOther>(socketMessage.data)
-                profileService.changeName(changeNameOther.userId, changeNameOther.name)
+                profileService.changeName(changeNameOther.userId, changeNameOther.name) { userId, message ->
+                    sendToSessionsOf(userId, message)
+                }
             }
             "change-unique-name-other" -> {
                 val changeNameOther = Cbor.decodeFromByteArray<ChangeNameOther>(socketMessage.data)
-                val success = profileService.changeUniqueName(changeNameOther.userId, changeNameOther.name)
+                val success = profileService.changeUniqueName(changeNameOther.userId, changeNameOther.name, sendToSessionsOf)
             }
             "create-request-to-me" -> {
                 val id = Cbor.decodeFromByteArray<Long>(socketMessage.data)

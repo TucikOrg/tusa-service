@@ -10,6 +10,7 @@ import com.coltsclub.tusa.app.dto.SendMessage
 import com.coltsclub.tusa.app.dto.messenger.InitChatsResponse
 import com.coltsclub.tusa.app.dto.messenger.InitMessenger
 import com.coltsclub.tusa.app.dto.messenger.InitMessagesResponse
+import com.coltsclub.tusa.app.dto.messenger.WritingMessage
 import com.coltsclub.tusa.app.exceptions.ChatUserDeletedException
 import com.coltsclub.tusa.app.service.ChatsService
 import com.coltsclub.tusa.app.service.MessagesService
@@ -43,6 +44,14 @@ class ChatBinaryHandler(
         session: WebSocketSession
     ) {
         when (socketMessage.type) {
+            "writing-message" -> {
+                // отправляем уведомление о том что пользователь печатает сообщение
+                val writingMessageInput = Cbor.decodeFromByteArray<WritingMessage>(socketMessage.data)
+                writingMessageInput.fromUserId = user.id!!
+                val data = Cbor.encodeToByteArray(writingMessageInput)
+                val response = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("writing-message", data)))
+                sendToSessionsOf(writingMessageInput.toUserId, response)
+            }
             "chats-actions" -> {
                 // получаем историю событий для и пользователя
                 val appTimePoint = Cbor.decodeFromByteArray<Long>(socketMessage.data)
@@ -76,7 +85,7 @@ class ChatBinaryHandler(
                 val data = Cbor.encodeToByteArray(
                     InitMessagesResponse(
                         messages = messages,
-                        timePoint = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+                        timePoint = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
                     )
                 )
 
@@ -91,7 +100,7 @@ class ChatBinaryHandler(
                 val data = Cbor.encodeToByteArray(
                     InitChatsResponse(
                         chats = chats,
-                        timePoint = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+                        timePoint = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
                     )
                 )
 

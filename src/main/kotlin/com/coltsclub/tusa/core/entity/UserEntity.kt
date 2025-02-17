@@ -7,6 +7,8 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.Id
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.userdetails.UserDetails
 
@@ -17,7 +19,8 @@ data class UserEntity(
     var name: String,
     @Enumerated(EnumType.STRING) val role: Role,
     var gmail: String,
-    var firebaseToken: String?
+    var firebaseToken: String?,
+    var lastOnlineTime: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC)
 ) : UserDetails {
     @Id
     @GeneratedValue

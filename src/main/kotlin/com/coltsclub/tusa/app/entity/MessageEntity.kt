@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import org.checkerframework.common.aliasing.qual.Unique
 
 @Entity(name = "message")
@@ -16,7 +17,7 @@ class MessageEntity(
     val message: String,
     @Column(unique = true)
     val temporaryId: String,
-    val creation: LocalDateTime = LocalDateTime.now(),
+    val creation: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC),
 ) {
     @Id
     @GeneratedValue(strategy= GenerationType.AUTO)

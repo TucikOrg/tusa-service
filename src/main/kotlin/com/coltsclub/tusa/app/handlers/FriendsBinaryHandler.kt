@@ -49,7 +49,7 @@ class FriendsBinaryHandler(
                 val friends = friendsService.getFriends(user.id!!)
                 val initState = FriendsInitializationState(
                     friends = friends,
-                    timePoint = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+                    timePoint = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
                 )
                 val data = Cbor.encodeToByteArray(initState)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("my-friends", data))
@@ -108,16 +108,19 @@ class FriendsBinaryHandler(
                     var userId = act.firstUserId
                     var userName = act.firstUserName
                     var userUniqueName = act.firstUserUniqueName
+                    var lastOnlineTime = act.firstUserLastOnlineTime
                     if (act.firstUserId == user.id) {
                         userId = act.secondUserId
                         userName = act.secondUserName
                         userUniqueName = act.secondUserUniqueName
+                        lastOnlineTime = act.secondUserLastOnlineTime
                     }
                     FriendActionDto(
                         friendDto = FriendDto(
                             id = userId,
                             name = userName,
-                            uniqueName = userUniqueName
+                            uniqueName = userUniqueName,
+                            lastOnlineTime = lastOnlineTime.toEpochSecond(ZoneOffset.UTC)
                         ),
                         friendsActionType = act.actionType,
                         actionTime = act.actionTime
@@ -129,6 +132,7 @@ class FriendsBinaryHandler(
                 session.sendMessage(response)
             }
             "accept-friend" -> {
+                // один участник которому отправили заявку в друзья принимает ее и добавляет другого участника в друзья
                 friendsHandlerFull.createFriends(socketMessage, user)
             }
             "delete-friend" -> {
@@ -148,7 +152,7 @@ class FriendsBinaryHandler(
                 val requests = friendsService.getToMeRequests(user.id!!)
                 val friendsRequestsInitializationState = FriendsRequestsInitializationState(
                     friends = requests,
-                    timePoint = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+                    timePoint = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
                 )
                 val data = Cbor.encodeToByteArray(friendsRequestsInitializationState)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("friends-requests", data))

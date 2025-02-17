@@ -58,6 +58,9 @@ class WebSocketHandler(
         friendsHandlerFull.sendToSessionsOf = { userId, message ->
             sendToSessionsOf(userId, message)
         }
+        friendsHandlerFull.sessionsContains = { userId ->
+            sessionsContains(userId)
+        }
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -87,6 +90,14 @@ class WebSocketHandler(
             sessionList.add(session)
         }
 
+        // отправляем всем друзьям информацию что пользователь онлайн
+        sendToFriendsIAmOnline(user.id, online = true)
+
+        // обновляем время последний раз в онлайне
+        profileService.updateLastOnlineTime(user.id, LocalDateTime.now(ZoneOffset.UTC)) { userId, msg ->
+            sendToSessionsOf(userId, msg)
+        }
+
         val remainsUserSessions = sessionList.size
         logger.info("Connection established. User: ${user.id}. Sessions: $remainsUserSessions")
     }
@@ -110,6 +121,14 @@ class WebSocketHandler(
         sessionList?.remove(session)
         val remainSessions = sessionList?.size?: -1
 
+        // отправляем всем друзьям информацию что пользователь оффлайн
+        sendToFriendsIAmOnline(user.id, online = false)
+
+        // обновляем время последний раз в онлайне
+        profileService.updateLastOnlineTime(user.id, LocalDateTime.now(ZoneOffset.UTC)) { userId, msg ->
+            sendToSessionsOf(userId, msg)
+        }
+
         logger.info("Connection closed. User: ${user.id}. Remains user sessions: $remainSessions")
     }
 
@@ -123,7 +142,7 @@ class WebSocketHandler(
         val ids = friends.map { it.id }
         ids.forEach { friendId ->
             val refreshAvatars = Cbor.encodeToByteArray(SocketBinaryMessage("refresh-avatars", Cbor.encodeToByteArray(
-                LocalDateTime.now().toEpochSecond(ZoneOffset.UTC) // отправляем серверное текущее время для сохранения временной точки синхронизации
+                LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC) // отправляем серверное текущее время для сохранения временной точки синхронизации
             )))
             sendToSessionsOf(friendId, BinaryMessage(refreshAvatars))
         }
@@ -159,17 +178,20 @@ class WebSocketHandler(
 
 
         when (socketMessage.type) {
+            "request-online-friends" -> {
+                // запросить статус онлайн друзей
+                val friends = friendsService.getFriends(user.id!!)
+                val ids = friends.map { it.id }
+                ids.forEach { friendId ->
+                    val isFriendOnline = IsOnlineDto(userId = friendId, isOnline = sessions.containsKey(friendId))
+                    val isFriendOnlineData = Cbor.encodeToByteArray(isFriendOnline)
+                    val response = Cbor.encodeToByteArray(SocketBinaryMessage("is-online", isFriendOnlineData))
+                    session.sendMessage(BinaryMessage(response))
+                }
+            }
             "firebase-token" -> {
                 val token = Cbor.decodeFromByteArray<String>(socketMessage.data)
                 profileService.saveFirebaseToken(user.id!!, token)
-            }
-            "is-online" -> {
-                val id = Cbor.decodeFromByteArray<Long>(socketMessage.data)
-                val isOnline = sessions[id]?.isNotEmpty() ?: false
-                val response = Cbor.encodeToByteArray(SocketBinaryMessage("is-online",
-                    Cbor.encodeToByteArray(IsOnlineDto(userId = id, isOnline = isOnline)))
-                )
-                session.sendMessage(BinaryMessage(response))
             }
             "locations" -> {
                 // хочу получить локации друзей
@@ -187,11 +209,15 @@ class WebSocketHandler(
             }
             "change-name" -> {
                 val name = Cbor.decodeFromByteArray<String>(socketMessage.data)
-                profileService.changeName(user.id!!, name)
+                profileService.changeName(user.id!!, name, sendToSessionsOf = { userId, msg ->
+                    sendToSessionsOf(userId, msg)
+                })
             }
             "change-unique-name" -> {
                 val uniqueName = Cbor.decodeFromByteArray<String>(socketMessage.data)
-                val success = profileService.changeUniqueName(user.id!!, uniqueName)
+                val success = profileService.changeUniqueName(user.id!!, uniqueName) { userId, msg ->
+                    sendToSessionsOf(userId, msg)
+                }
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("change-unique-name", Cbor.encodeToByteArray(success)))
                 session.sendMessage(BinaryMessage(response))
             }
@@ -241,6 +267,22 @@ class WebSocketHandler(
             }
         }
         return sentCount
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun sendToFriendsIAmOnline(userId: Long, online: Boolean) {
+        val friends = friendsService.getFriends(userId)
+        val ids = friends.map { it.id }
+        ids.forEach { friendId ->
+            val response = Cbor.encodeToByteArray(SocketBinaryMessage("is-online",
+                Cbor.encodeToByteArray(IsOnlineDto(userId = userId, isOnline = online)))
+            )
+            sendToSessionsOf(friendId, BinaryMessage(response))
+        }
+    }
+
+    fun sessionsContains(userId: Long): Boolean {
+        return sessions.containsKey(userId)
     }
 
     fun removeClosedSessionsOfUser(userId: Long) {

@@ -55,7 +55,6 @@ class ChatsService(
             MessagesActionsEntity(
                 messageId = savedMessage.id!!,
                 actionType = MessagesActionType.ADD,
-                actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC),
                 firstUserId = firstId,
                 secondUserId = secondId,
                 senderId = userId,
@@ -88,7 +87,7 @@ class ChatsService(
                 ChatsActionsEntity(
                     chatId = savedChat.id!!,
                     actionType = ChatsActionType.ADD,
-                    actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC),
+                    actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
                     firstUserId = firstId,
                     secondUserId = secondId,
                     firsUserName = savedChat.firsUserName,
@@ -160,7 +159,7 @@ class ChatsService(
                 ChatsActionsEntity(
                     chatId = chat.id!!,
                     actionType = ChatsActionType.DELETE,
-                    actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC),
+                    actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
                     firstUserId = firstId,
                     secondUserId = secondId,
                     firsUserName = chat.firsUserName,

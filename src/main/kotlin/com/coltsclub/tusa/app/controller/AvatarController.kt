@@ -53,7 +53,7 @@ class AvatarController(
             AvatarActionsEntity(
                 ownerId = userId,
                 actionType = AvatarActionType.CHANGE,
-                actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+                actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
             )
         )
 

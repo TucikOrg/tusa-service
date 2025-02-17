@@ -1,6 +1,7 @@
 package com.coltsclub.tusa.app.handlers.full
 
 import com.coltsclub.tusa.app.dto.AddLocationDto
+import com.coltsclub.tusa.app.dto.IsOnlineDto
 import com.coltsclub.tusa.app.dto.UpdateLocationDto
 import com.coltsclub.tusa.app.service.FriendsService
 import com.coltsclub.tusa.app.service.LocationService
@@ -19,6 +20,7 @@ class FriendsHandlerFull(
     private val locationService: LocationService
 ) {
     lateinit var sendToSessionsOf: (Long, BinaryMessage) -> Unit
+    lateinit var sessionsContains: (Long) -> Boolean
 
     @OptIn(ExperimentalSerializationApi::class)
     fun createFriends(socketMessage: SocketBinaryMessage, user: UserEntity) {
@@ -36,6 +38,19 @@ class FriendsHandlerFull(
         // отправляем другу информацию о том что он добавлен
         sendToSessionsOf(id, refreshFriends)
         sendToSessionsOf(id, refreshFriendsRequests)
+
+
+        // отправляем мне информацию о том в онлайне ли друг
+        val isFriendOnline = IsOnlineDto(userId = id, isOnline = sessionsContains(id))
+        val isFriendOnlineData = Cbor.encodeToByteArray(isFriendOnline)
+        val friendIsOnlineResponse = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("is-online", isFriendOnlineData)))
+        sendToSessionsOf(user.id, friendIsOnlineResponse)
+
+        // отправляем другу информацию о том в онлайне ли я
+        val isMeOnline = IsOnlineDto(userId = user.id, isOnline = sessionsContains(user.id))
+        val isMeOnlineData = Cbor.encodeToByteArray(isMeOnline)
+        val meIsOnlineResponse = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("is-online", isMeOnlineData)))
+        sendToSessionsOf(id, meIsOnlineResponse)
 
 
         // отправляем другу мою локацию

@@ -33,15 +33,18 @@ class FriendsService(
             var friendId = user.firstUserId
             var friendName = user.firstUserName
             var friendUniqueName = user.firstUserUniqueName
+            var lastOnlineTime = user.firstUserLastOnlineTime
             if (friendId == userId) {
                 friendId = user.secondUserId
                 friendName = user.secondUserName
                 friendUniqueName = user.secondUserUniqueName
+                lastOnlineTime = user.secondUserLastOnlineTime
             }
             FriendDto(
                 id = friendId,
                 name = friendName,
-                uniqueName = friendUniqueName
+                uniqueName = friendUniqueName,
+                lastOnlineTime = lastOnlineTime.toEpochSecond(ZoneOffset.UTC)
             )
         }
     }
@@ -88,7 +91,7 @@ class FriendsService(
             firstUserUniqueName = firstUser.userUniqueName,
             secondUserUniqueName = secondUser.userUniqueName,
             actorId = userId,
-            actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC),
+            actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
             actionType = FriendsActionType.ADD
         ))
 
@@ -128,7 +131,9 @@ class FriendsService(
                 firstUserUniqueName = firstUser.userUniqueName,
                 secondUserUniqueName = secondUser.userUniqueName,
                 actionType = FriendsActionType.DELETE,
-                actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+                actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
+                firstUserLastOnlineTime = firstUser.lastOnlineTime,
+                secondUserLastOnlineTime = secondUser.lastOnlineTime
             )
         )
     }
@@ -165,7 +170,7 @@ class FriendsService(
                 secondUserUniqueName = secondUser.userUniqueName,
                 actorId = userId,
                 actionType = FriendsActionType.DELETE,
-                actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+                actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
             ))
         }
 
@@ -176,7 +181,9 @@ class FriendsService(
             firstUserName = firstUser.name,
             secondUserName = secondUser.name,
             firstUserUniqueName = firstUser.userUniqueName,
-            secondUserUniqueName = secondUser.userUniqueName
+            secondUserUniqueName = secondUser.userUniqueName,
+            firstUserLastOnlineTime = firstUser.lastOnlineTime,
+            secondUserLastOnlineTime = secondUser.lastOnlineTime
         ))
 
         // cохраняем действия добавления в друзья
@@ -187,8 +194,10 @@ class FriendsService(
             secondUserName = secondUser.name,
             firstUserUniqueName = firstUser.userUniqueName,
             secondUserUniqueName = secondUser.userUniqueName,
-            actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC),
-            actionType = FriendsActionType.ADD
+            actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
+            actionType = FriendsActionType.ADD,
+            firstUserLastOnlineTime = firstUser.lastOnlineTime,
+            secondUserLastOnlineTime = secondUser.lastOnlineTime
         ))
     }
 
@@ -232,7 +241,7 @@ class FriendsService(
             secondUserName = secondUser.name,
             secondUserUniqueName = secondUser.userUniqueName,
             actorId = userId,
-            actionTime = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC),
+            actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
             actionType = FriendsActionType.DELETE
         ))
     }
@@ -240,7 +249,13 @@ class FriendsService(
     fun findUsers(userId: Long, name: String): List<FriendDto> {
         val users = userRepository.findCandidateFriends(name, userId, Pageable.ofSize(10))
         return users.map { user ->
-            FriendDto(user.id!!, user.name?: "", user.userUniqueName)
+            FriendDto(
+                id = user.id!!,
+                name = user.name,
+                uniqueName = user.userUniqueName,
+                lastOnlineTime = user.lastOnlineTime.toEpochSecond(ZoneOffset.UTC)
+            )
         }
     }
+
 }

@@ -10,10 +10,10 @@ import jakarta.persistence.Id
 class ChatEntity(
     var firstUserId: Long,
     val secondUserId: Long,
-    val firsUserName: String,
-    val secondUserName: String,
-    val firstUserUniqueName: String?,
-    val secondUserUniqueName: String?,
+    var firsUserName: String,
+    var secondUserName: String,
+    var firstUserUniqueName: String?,
+    var secondUserUniqueName: String?,
 ) {
     @Id
     @GeneratedValue(strategy= GenerationType.AUTO)

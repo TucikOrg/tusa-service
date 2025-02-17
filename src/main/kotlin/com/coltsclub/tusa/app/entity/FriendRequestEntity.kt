@@ -5,6 +5,7 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 @Entity(name = "friendRequest")
 data class FriendRequestEntity(
@@ -15,7 +16,7 @@ data class FriendRequestEntity(
     val firstUserUniqueName: String?,
     val secondUserUniqueName: String?,
     val actorId: Long,
-    val date: LocalDateTime = LocalDateTime.now()
+    val date: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC)
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

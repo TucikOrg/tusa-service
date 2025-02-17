@@ -5,6 +5,7 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 @Entity(name = "message_state")
 data class MessagesActionsEntity(
@@ -14,9 +15,9 @@ data class MessagesActionsEntity(
     val senderId: Long,
     val message: String,
     val messageTemporaryId: String,
-    val messageCreation: LocalDateTime = LocalDateTime.now(),
+    val messageCreation: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC),
     val actionType: MessagesActionType,
-    val actionTime: Long
+    val actionTime: Long = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
