@@ -125,7 +125,8 @@ class ChatBinaryHandler(
                         senderId = it.senderId,
                         message = it.message,
                         creation = it.creation.toEpochSecond(ZoneOffset.UTC),
-                        temporaryId = it.temporaryId
+                        temporaryId = it.temporaryId,
+                        payload = it.payload.joinToString(separator = ",")
                     )
                 }
                 val data = Cbor.encodeToByteArray(
@@ -176,7 +177,8 @@ class ChatBinaryHandler(
                         userId = user.id!!,
                         toUserId = sendMessage.toId,
                         message = sendMessage.message,
-                        tempId = sendMessage.temporaryId
+                        tempId = sendMessage.temporaryId,
+                        payload = sendMessage.payload
                     )
 
                     // уведомляем пользователя о новом сообщении

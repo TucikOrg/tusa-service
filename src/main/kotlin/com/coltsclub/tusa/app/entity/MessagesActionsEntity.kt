@@ -17,7 +17,8 @@ data class MessagesActionsEntity(
     val messageTemporaryId: String,
     val messageCreation: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC),
     val actionType: MessagesActionType,
-    val actionTime: Long = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
+    val actionTime: Long = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
+    val messagePayload: List<String>
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

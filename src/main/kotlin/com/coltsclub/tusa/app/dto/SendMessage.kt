@@ -7,5 +7,5 @@ data class SendMessage(
     val toId: Long,
     val message: String,
     val temporaryId: String,
-    val payload: List<Long>
+    val payload: List<String>
 )

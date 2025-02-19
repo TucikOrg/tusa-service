@@ -33,7 +33,13 @@ class ChatsService(
     private val userRepository: UserRepository
 ) {
     @Transactional
-    fun sendMessage(userId: Long, toUserId: Long, message: String, tempId: String): SendMessageResult {
+    fun sendMessage(
+        userId: Long,
+        toUserId: Long,
+        message: String,
+        tempId: String,
+        payload: List<String>
+    ): SendMessageResult {
         var chatCreated = false
         val ids = AlineTwoLongsIds.aline(userId, toUserId)
         val firstId = ids.first
@@ -46,7 +52,8 @@ class ChatsService(
                 secondUserId = secondId,
                 senderId = userId,
                 message = message,
-                temporaryId = tempId
+                temporaryId = tempId,
+                payload = payload
             )
         )
 
@@ -59,7 +66,8 @@ class ChatsService(
                 secondUserId = secondId,
                 senderId = userId,
                 message = message,
-                messageTemporaryId = tempId
+                messageTemporaryId = tempId,
+                messagePayload = payload
             )
         )
 

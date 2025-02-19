@@ -4,6 +4,7 @@ import com.coltsclub.tusa.app.handlers.ChatBinaryHandler
 import com.coltsclub.tusa.app.dto.AddLocationDto
 import com.coltsclub.tusa.app.dto.AvatarAction
 import com.coltsclub.tusa.app.dto.AvatarDTO
+import com.coltsclub.tusa.app.dto.ImageDto
 import com.coltsclub.tusa.app.dto.IsOnlineDto
 import com.coltsclub.tusa.app.handlers.AdminBinaryHandler
 import com.coltsclub.tusa.app.handlers.FriendsBinaryHandler
@@ -12,6 +13,7 @@ import com.coltsclub.tusa.app.repository.AvatarActionsRepository
 import com.coltsclub.tusa.app.service.FriendsService
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.app.service.AvatarService
+import com.coltsclub.tusa.app.service.ImageService
 import com.coltsclub.tusa.app.service.LocationService
 import com.coltsclub.tusa.app.service.ProfileService
 import java.time.LocalDateTime
@@ -39,7 +41,8 @@ class WebSocketHandler(
     private val adminBinaryHandler: AdminBinaryHandler,
     private val friendsBinaryHandler: FriendsBinaryHandler,
     private val friendsHandlerFull: FriendsHandlerFull,
-    private val avatarsActionsRepository: AvatarActionsRepository
+    private val avatarsActionsRepository: AvatarActionsRepository,
+    private val imageService: ImageService
 ) : BinaryWebSocketHandler() {
     private val sessions = ConcurrentHashMap<Long, MutableList<WebSocketSession>>()
     private val closingSessions = ConcurrentHashMap<String, Unit>()
@@ -219,6 +222,15 @@ class WebSocketHandler(
                     sendToSessionsOf(userId, msg)
                 }
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("change-unique-name", Cbor.encodeToByteArray(success)))
+                session.sendMessage(BinaryMessage(response))
+            }
+            "image" -> {
+                // загрузить картинку любого пользователя
+                val imageDto = Cbor.decodeFromByteArray<ImageDto>(socketMessage.data)
+                val imageBytes = imageService.getImageByTempFileId(imageDto.localFilePathId, imageDto.ownerId)
+                val imageResponseDto = ImageDto(imageDto.ownerId, imageDto.localFilePathId, imageBytes)
+                val encoded: ByteArray = Cbor.encodeToByteArray<ImageDto>(imageResponseDto)
+                val response = Cbor.encodeToByteArray(SocketBinaryMessage("image", encoded))
                 session.sendMessage(BinaryMessage(response))
             }
             "avatar" -> {
