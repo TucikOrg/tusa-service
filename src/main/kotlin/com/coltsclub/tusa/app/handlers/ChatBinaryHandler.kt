@@ -126,7 +126,7 @@ class ChatBinaryHandler(
                         message = it.message,
                         creation = it.creation.toEpochSecond(ZoneOffset.UTC),
                         temporaryId = it.temporaryId,
-                        payload = it.payload.joinToString(separator = ",")
+                        payload = it.payload.joinToString(separator = ","),
                     )
                 }
                 val data = Cbor.encodeToByteArray(
@@ -210,6 +210,8 @@ class ChatBinaryHandler(
                     // сообщаем тому кто пытался отправить сообщение что чат был зачищен
                     val refreshChats = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-chats", byteArrayOf())))
                     sendToSessionsOf(user.id, refreshChats)
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
         }

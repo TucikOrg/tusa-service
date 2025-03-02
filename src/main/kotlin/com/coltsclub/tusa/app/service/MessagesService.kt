@@ -26,7 +26,7 @@ class MessagesService(
                 creation = it.creation.toEpochSecond(ZoneOffset.UTC),
                 senderId = it.senderId,
                 temporaryId = it.temporaryId,
-                payload = it.payload.joinToString(separator = ",")
+                payload = it.payload.joinToString(separator = ","),
             )
         }
     }
@@ -50,7 +50,7 @@ class MessagesService(
                     creation = it.messageCreation.toEpochSecond(ZoneOffset.UTC),
                     senderId = it.senderId,
                     temporaryId = it.messageTemporaryId,
-                    payload = it.messagePayload.joinToString(separator = ",")
+                    payload = it.messagePayload.joinToString(separator = ","),
                 ),
                 actionType = it.actionType,
                 actionTime = it.actionTime

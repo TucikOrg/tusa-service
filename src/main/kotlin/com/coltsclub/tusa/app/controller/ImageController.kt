@@ -1,13 +1,8 @@
 package com.coltsclub.tusa.app.controller
 
-import com.coltsclub.tusa.app.entity.AvatarActionType
-import com.coltsclub.tusa.app.entity.AvatarActionsEntity
-import com.coltsclub.tusa.app.entity.AvatarEntity
 import com.coltsclub.tusa.app.entity.ImageEntity
 import com.coltsclub.tusa.app.repository.ImageRepository
 import com.coltsclub.tusa.core.exceptions.TucikBadRequest
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.PostMapping

@@ -11,5 +11,5 @@ data class MessageResponse(
     var senderId: Long,
     val message: String,
     val creation: Long,
-    val payload: String
+    val payload: String,
 )
