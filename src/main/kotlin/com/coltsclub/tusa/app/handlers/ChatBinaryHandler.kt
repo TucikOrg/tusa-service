@@ -23,6 +23,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
@@ -36,6 +37,7 @@ class ChatBinaryHandler(
     private val pushNotificationService: PushNotificationService
 ) {
     lateinit var sendToSessionsOf: (Long, BinaryMessage) -> Int
+    private val logger = LoggerFactory.getLogger(ChatBinaryHandler::class.java)
 
     @OptIn(ExperimentalSerializationApi::class)
     fun handleBinaryMessage(
@@ -181,21 +183,6 @@ class ChatBinaryHandler(
                         payload = sendMessage.payload
                     )
 
-                    // уведомляем пользователя о новом сообщении
-                    // и уведомляем отправителя что сообщение было доставлено
-                    val refreshMessages = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-messages", byteArrayOf())))
-                    sendToSessionsOf(user.id, refreshMessages)
-                    val countOfSessions = sendToSessionsOf(sendMessage.toId, refreshMessages)
-                    if (countOfSessions == 0) {
-                        // если друг не онлайн то отправляем уведомление
-                        // он его получит оффлайн
-                        pushNotificationService.sendNewMessageNotification(
-                            toUserId = sendMessage.toId,
-                            fromUserId = user.id,
-                            message = sendMessage.message
-                        )
-                    }
-
                     // если чат был создан то уведомляем о том что нужно обновить состояние чатов
                     if (result.chatCreated) {
                         val refreshChats = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-chats", byteArrayOf())))
@@ -211,7 +198,22 @@ class ChatBinaryHandler(
                     val refreshChats = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-chats", byteArrayOf())))
                     sendToSessionsOf(user.id, refreshChats)
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    logger.error("Error while sending message, ${e.message}")
+                }
+
+                // уведомляем пользователя о новом сообщении
+                // и уведомляем отправителя что сообщение было доставлено
+                val refreshMessages = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-messages", byteArrayOf())))
+                sendToSessionsOf(user.id!!, refreshMessages)
+                val countOfSessions = sendToSessionsOf(sendMessage.toId, refreshMessages)
+                if (countOfSessions == 0) {
+                    // если друг не онлайн то отправляем уведомление
+                    // он его получит оффлайн
+                    pushNotificationService.sendNewMessageNotification(
+                        toUserId = sendMessage.toId,
+                        fromUserId = user.id,
+                        message = sendMessage.message
+                    )
                 }
             }
         }

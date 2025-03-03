@@ -3,13 +3,9 @@ package com.coltsclub.tusa.app.service
 import com.coltsclub.tusa.app.entity.ChatsActionType
 import com.coltsclub.tusa.app.entity.ChatsActionsEntity
 import com.coltsclub.tusa.app.entity.FriendEntity
-import com.coltsclub.tusa.app.entity.FriendsActionType
-import com.coltsclub.tusa.app.entity.FriendsActionsEntity
 import com.coltsclub.tusa.app.repository.ChatRepository
 import com.coltsclub.tusa.app.repository.ChatsActionsRepository
 import com.coltsclub.tusa.app.repository.FriendRepository
-import com.coltsclub.tusa.app.repository.FriendsActionsRepository
-import com.coltsclub.tusa.core.AlineTwoLongsIds
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.core.enums.Role
 import com.coltsclub.tusa.core.repository.UserRepository
@@ -30,7 +26,6 @@ import org.springframework.web.socket.BinaryMessage
 @Service
 class ProfileService(
     private val userRepository: UserRepository,
-    private val friendsActionsRepository: FriendsActionsRepository,
     private val friendsRepository: FriendRepository,
     private val chatsActionsRepository: ChatsActionsRepository,
     private val chatRepository: ChatRepository
@@ -61,46 +56,16 @@ class ProfileService(
         chatRepository.saveAll(chats)
 
         // для друзей этого пользователя тоже нужно поменять имя
-
         for (friend in friends) {
             if (userId == friend.firstUserId) {
                 friend.firstUserName = name
             } else {
                 friend.secondUserName = name
             }
+            friend.updateTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
         }
         friendsRepository.saveAll(friends)
 
-        val saveActions = mutableListOf<FriendsActionsEntity>()
-        for (friend in friends) {
-            val firstId = friend.firstUserId
-            val secondId = friend.secondUserId
-
-            var useFirstUserName = friend.firstUserName
-            var useSecondUserName = friend.secondUserName
-            if (userId == firstId) {
-                useFirstUserName = name
-            } else {
-                useSecondUserName = name
-            }
-
-            val changeEntity = FriendsActionsEntity(
-                firstUserId = firstId,
-                secondUserId = secondId,
-                firstUserName = useFirstUserName,
-                secondUserName = useSecondUserName,
-                firstUserUniqueName = friend.firstUserUniqueName,
-                secondUserUniqueName = friend.secondUserUniqueName,
-                actionType = FriendsActionType.CHANGE,
-                actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
-                firstUserLastOnlineTime = friend.firstUserLastOnlineTime,
-                secondUserLastOnlineTime = friend.secondUserLastOnlineTime
-            )
-            saveActions.add(changeEntity)
-        }
-
-        // сохраняем изменения (имени) для друзей
-        friendsActionsRepository.saveAll(saveActions)
 
         // теперь нужно имена в чатах обновить
         val chatChangeActions = mutableListOf<ChatsActionsEntity>()
@@ -189,40 +154,10 @@ class ProfileService(
             } else {
                 friend.secondUserUniqueName = newUniqueName
             }
+            friend.updateTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
         }
         friendsRepository.saveAll(friends)
 
-
-        val saveActions = mutableListOf<FriendsActionsEntity>()
-        for (friend in friends) {
-            val firstId = friend.firstUserId
-            val secondId = friend.secondUserId
-
-            var useFirstUserUniqueName = friend.firstUserName
-            var useSecondUserUniqueName = friend.secondUserName
-            if (userId == firstId) {
-                useFirstUserUniqueName = newUniqueName
-            } else {
-                useSecondUserUniqueName = newUniqueName
-            }
-
-            val changeEntity = FriendsActionsEntity(
-                firstUserId = firstId,
-                secondUserId = secondId,
-                firstUserName = friend.firstUserName,
-                secondUserName = friend.secondUserName,
-                firstUserUniqueName = useFirstUserUniqueName,
-                secondUserUniqueName = useSecondUserUniqueName,
-                actionType = FriendsActionType.CHANGE,
-                actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
-                firstUserLastOnlineTime = friend.firstUserLastOnlineTime,
-                secondUserLastOnlineTime = friend.secondUserLastOnlineTime
-            )
-            saveActions.add(changeEntity)
-        }
-
-        // сохраняем изменения (имени) для друзей
-        friendsActionsRepository.saveAll(saveActions)
 
         // теперь нужно имена в чатах обновить
         val chatChangeActions = mutableListOf<ChatsActionsEntity>()
@@ -325,40 +260,9 @@ class ProfileService(
             } else {
                 friend.secondUserLastOnlineTime = lastOnlineTime
             }
+            friend.updateTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
         }
         friendsRepository.saveAll(friends)
-
-
-        val saveActions = mutableListOf<FriendsActionsEntity>()
-        for (friend in friends) {
-            val firstId = friend.firstUserId
-            val secondId = friend.secondUserId
-
-            var useFirst = friend.firstUserLastOnlineTime
-            var useSecond = friend.secondUserLastOnlineTime
-            if (userId == firstId) {
-                useFirst = lastOnlineTime
-            } else {
-                useSecond = lastOnlineTime
-            }
-
-            val changeEntity = FriendsActionsEntity(
-                firstUserId = firstId,
-                secondUserId = secondId,
-                firstUserName = friend.firstUserName,
-                secondUserName = friend.secondUserName,
-                firstUserUniqueName = friend.firstUserUniqueName,
-                secondUserUniqueName = friend.secondUserUniqueName,
-                actionType = FriendsActionType.CHANGE,
-                actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
-                firstUserLastOnlineTime = useFirst,
-                secondUserLastOnlineTime = useSecond
-            )
-            saveActions.add(changeEntity)
-        }
-
-        // сохраняем изменения для друзей
-        friendsActionsRepository.saveAll(saveActions)
     }
 
     @OptIn(ExperimentalSerializationApi::class)

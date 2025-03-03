@@ -11,7 +11,7 @@ import java.time.ZoneOffset
 class AvatarEntity(
     var ownerId: Long,
     val avatar: ByteArray,
-    val creation: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC)
+    val creation: Long = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
 ) {
     @Id
     @GeneratedValue(strategy= GenerationType.AUTO)

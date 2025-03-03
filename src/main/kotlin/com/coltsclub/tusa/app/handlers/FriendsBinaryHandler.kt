@@ -1,14 +1,12 @@
 package com.coltsclub.tusa.app.handlers
 
-import com.coltsclub.tusa.app.dto.FriendActionDto
 import com.coltsclub.tusa.app.dto.FriendDto
-import com.coltsclub.tusa.app.dto.FriendRequestActionDto
 import com.coltsclub.tusa.app.dto.FriendRequestDto
 import com.coltsclub.tusa.app.dto.FriendsInitializationState
 import com.coltsclub.tusa.app.dto.FriendsRequestsInitializationState
 import com.coltsclub.tusa.app.handlers.full.FriendsHandlerFull
-import com.coltsclub.tusa.app.repository.FriendsActionsRepository
-import com.coltsclub.tusa.app.repository.FriendsRequestsActionsRepository
+import com.coltsclub.tusa.app.repository.FriendRepository
+import com.coltsclub.tusa.app.repository.FriendRequestRepository
 import com.coltsclub.tusa.app.service.FriendsService
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.core.socket.SocketBinaryMessage
@@ -25,8 +23,8 @@ import org.springframework.web.socket.WebSocketSession
 @Service
 class FriendsBinaryHandler(
     private val friendsService: FriendsService,
-    private val friendsRequestsActionsRepository: FriendsRequestsActionsRepository,
-    private val friendsActionsRepository: FriendsActionsRepository,
+    private val friendRepository: FriendRepository,
+    private val friendRequestRepository: FriendRequestRepository,
     private val friendsHandlerFull: FriendsHandlerFull
 ) {
     lateinit var sendToSessionsOf: (Long, BinaryMessage) -> Unit
@@ -67,12 +65,12 @@ class FriendsBinaryHandler(
             }
             "friends-requests-actions" -> {
                 val appTimePoint = Cbor.decodeFromByteArray<Long>(socketMessage.data)
-                val actions = friendsRequestsActionsRepository.findAllByFirstUserIdOrSecondUserIdAndActionTimeGreaterThan(
+                val actions = friendRequestRepository.findAllByFirstUserIdOrSecondUserIdAndUpdateTimeGreaterThan(
                     firstUserId = user.id!!,
                     secondUserId = user.id,
-                    actionTime = appTimePoint
+                    updateTime = appTimePoint
                 )
-                val friendsRequestsActionsDto = actions.map { act ->
+                val friendsRequestsDto = actions.map { act ->
                     var userId = act.firstUserId
                     var userName = act.firstUserName
                     var userUniqueName = act.firstUserUniqueName
@@ -82,29 +80,27 @@ class FriendsBinaryHandler(
                         userUniqueName = act.secondUserUniqueName
                     }
 
-                    FriendRequestActionDto(
-                        friendRequestDto = FriendRequestDto(
-                            userId = userId,
-                            userName = userName,
-                            userUniqueName = userUniqueName,
-                            isRequestSender = act.actorId == userId
-                        ),
-                        friendsActionType = act.actionType,
-                        actionTime = act.actionTime
+                    FriendRequestDto(
+                        userId = userId,
+                        userName = userName,
+                        userUniqueName = userUniqueName,
+                        isRequestSender = act.actorId == userId,
+                        updateTime = act.updateTime,
+                        deleted = act.deleted
                     )
                 }
-                val actionsBinary = Cbor.encodeToByteArray(SocketBinaryMessage("friends-requests-actions", Cbor.encodeToByteArray(friendsRequestsActionsDto)))
+                val actionsBinary = Cbor.encodeToByteArray(SocketBinaryMessage("friends-requests-actions", Cbor.encodeToByteArray(friendsRequestsDto)))
                 val response = BinaryMessage(actionsBinary)
                 session.sendMessage(response)
             }
             "friends-actions" -> {
                 val appTimePoint = Cbor.decodeFromByteArray<Long>(socketMessage.data)
-                val actions = friendsActionsRepository.findAllByFirstUserIdOrSecondUserIdAndActionTimeGreaterThan(
+                val friends = friendRepository.findAllByFirstUserIdOrSecondUserIdAndUpdateTimeGreaterThan(
                     firstUserId = user.id!!,
                     secondUserId = user.id,
-                    actionTime = appTimePoint
+                    updateTime = appTimePoint
                 )
-                val friendsActionsDto = actions.map { act ->
+                val friendsActionsDto = friends.map { act ->
                     var userId = act.firstUserId
                     var userName = act.firstUserName
                     var userUniqueName = act.firstUserUniqueName
@@ -115,15 +111,13 @@ class FriendsBinaryHandler(
                         userUniqueName = act.secondUserUniqueName
                         lastOnlineTime = act.secondUserLastOnlineTime
                     }
-                    FriendActionDto(
-                        friendDto = FriendDto(
-                            id = userId,
-                            name = userName,
-                            uniqueName = userUniqueName,
-                            lastOnlineTime = lastOnlineTime.toEpochSecond(ZoneOffset.UTC)
-                        ),
-                        friendsActionType = act.actionType,
-                        actionTime = act.actionTime
+                    FriendDto(
+                        id = userId,
+                        name = userName,
+                        uniqueName = userUniqueName,
+                        lastOnlineTime = lastOnlineTime.toEpochSecond(ZoneOffset.UTC),
+                        updateTime = act.updateTime,
+                        deleted = act.deleted
                     )
                 }
 

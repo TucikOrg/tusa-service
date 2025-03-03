@@ -16,7 +16,8 @@ data class FriendRequestEntity(
     val firstUserUniqueName: String?,
     val secondUserUniqueName: String?,
     val actorId: Long,
-    val date: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC)
+    var deleted: Boolean,
+    var updateTime: Long = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

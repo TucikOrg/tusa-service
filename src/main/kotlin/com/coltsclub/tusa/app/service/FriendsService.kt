@@ -4,13 +4,8 @@ import com.coltsclub.tusa.app.dto.FriendDto
 import com.coltsclub.tusa.app.dto.FriendRequestDto
 import com.coltsclub.tusa.app.entity.FriendEntity
 import com.coltsclub.tusa.app.entity.FriendRequestEntity
-import com.coltsclub.tusa.app.entity.FriendsActionType
-import com.coltsclub.tusa.app.entity.FriendsActionsEntity
-import com.coltsclub.tusa.app.entity.FriendsRequestsActionsEntity
 import com.coltsclub.tusa.app.repository.FriendRepository
 import com.coltsclub.tusa.app.repository.FriendRequestRepository
-import com.coltsclub.tusa.app.repository.FriendsActionsRepository
-import com.coltsclub.tusa.app.repository.FriendsRequestsActionsRepository
 import com.coltsclub.tusa.core.AlineTwoLongsIds
 import com.coltsclub.tusa.core.repository.UserRepository
 import jakarta.transaction.Transactional
@@ -24,8 +19,6 @@ class FriendsService(
     private val friendRepository: FriendRepository,
     private val friendRequestRepository: FriendRequestRepository,
     private val userRepository: UserRepository,
-    private val friendsActionsRepository: FriendsActionsRepository,
-    private val friendsRequestsActionsRepository: FriendsRequestsActionsRepository
 ) {
     fun getFriends(userId: Long): List<FriendDto> {
         val friends = friendRepository.findByFirstUserIdOrSecondUserId(userId, userId)
@@ -44,7 +37,9 @@ class FriendsService(
                 id = friendId,
                 name = friendName,
                 uniqueName = friendUniqueName,
-                lastOnlineTime = lastOnlineTime.toEpochSecond(ZoneOffset.UTC)
+                lastOnlineTime = lastOnlineTime.toEpochSecond(ZoneOffset.UTC),
+                updateTime = user.updateTime,
+                deleted = user.deleted
             )
         }
     }
@@ -72,18 +67,7 @@ class FriendsService(
         }
 
         // Если нету то создаем
-        friendRequestRepository.save(FriendRequestEntity(
-            firstUserId = firstId,
-            secondUserId = secondId,
-            firstUserName = firstUser.name,
-            secondUserName = secondUser.name,
-            firstUserUniqueName = firstUser.userUniqueName,
-            secondUserUniqueName = secondUser.userUniqueName,
-            actorId = userId
-        ))
-
-        // создаем действие создания заявки в друзья
-        friendsRequestsActionsRepository.save(FriendsRequestsActionsEntity(
+        val friendRequestEntity = friendRequestRepository.save(FriendRequestEntity(
             firstUserId = firstId,
             secondUserId = secondId,
             firstUserName = firstUser.name,
@@ -91,8 +75,7 @@ class FriendsService(
             firstUserUniqueName = firstUser.userUniqueName,
             secondUserUniqueName = secondUser.userUniqueName,
             actorId = userId,
-            actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
-            actionType = FriendsActionType.ADD
+            deleted = false
         ))
 
         return listOf(
@@ -100,13 +83,17 @@ class FriendsService(
                 userId = secondId,
                 userName = secondUser.name,
                 userUniqueName = secondUser.userUniqueName,
-                isRequestSender = secondId == userId
+                isRequestSender = secondId == userId,
+                updateTime = friendRequestEntity.updateTime,
+                deleted = friendRequestEntity.deleted
             ),
             FriendRequestDto(
                 userId = firstId,
                 userName = firstUser.name,
                 userUniqueName = firstUser.userUniqueName,
-                isRequestSender = firstId == userId
+                isRequestSender = firstId == userId,
+                updateTime = friendRequestEntity.updateTime,
+                deleted = friendRequestEntity.deleted
             )
         )
     }
@@ -116,26 +103,11 @@ class FriendsService(
         val ids = AlineTwoLongsIds.aline(userId, deleteFriend)
         val firstId = ids.first
         val secondId = ids.second
-        friendRepository.deleteByFirstUserIdAndSecondUserId(firstId, secondId)
-
-        val firstUser = userRepository.findById(firstId).get()
-        val secondUser = userRepository.findById(secondId).get()
-
-        // cохраняем действия удаления
-        friendsActionsRepository.save(
-            FriendsActionsEntity(
-                firstUserId = firstId,
-                secondUserId = secondId,
-                firstUserName = firstUser.name,
-                secondUserName = secondUser.name,
-                firstUserUniqueName = firstUser.userUniqueName,
-                secondUserUniqueName = secondUser.userUniqueName,
-                actionType = FriendsActionType.DELETE,
-                actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
-                firstUserLastOnlineTime = firstUser.lastOnlineTime,
-                secondUserLastOnlineTime = secondUser.lastOnlineTime
-            )
-        )
+        friendRepository.findByFirstUserIdAndSecondUserId(secondId, firstId)?.let {
+            it.deleted = true
+            it.updateTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
+            friendRepository.save(it)
+        }
     }
 
     fun alreadyFriends(userId: Long, withUserId: Long): Boolean {
@@ -144,6 +116,16 @@ class FriendsService(
         val secondId = ids.second
         val friendRow = friendRepository.findByFirstUserIdAndSecondUserId(firstId, secondId)
         return friendRow != null
+    }
+
+    fun deleteFriendRequest(firstId: Long, secondId: Long): FriendRequestEntity? {
+        val request = friendRequestRepository.findByFirstUserIdAndSecondUserId(firstId, secondId)
+        if (request != null) {
+            request.deleted = true
+            request.updateTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
+            friendRequestRepository.save(request)
+        }
+        return request
     }
 
     @Transactional
@@ -157,22 +139,7 @@ class FriendsService(
         val secondUser = userRepository.findById(secondId).get()
 
         // удаляем заявку если есть
-        val requestDeleted = friendRequestRepository.deleteByFirstUserIdAndSecondUserId(firstId, secondId) > 0
-
-        if (requestDeleted) {
-            // сохраняем действие удаления заявки
-            friendsRequestsActionsRepository.save(FriendsRequestsActionsEntity(
-                firstUserId = firstId,
-                secondUserId = secondId,
-                firstUserName = firstUser.name,
-                secondUserName = secondUser.name,
-                firstUserUniqueName = firstUser.userUniqueName,
-                secondUserUniqueName = secondUser.userUniqueName,
-                actorId = userId,
-                actionType = FriendsActionType.DELETE,
-                actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
-            ))
-        }
+        deleteFriendRequest(firstId, secondId)
 
         // сохраняем запись о создании друзей
         friendRepository.save(FriendEntity(
@@ -183,21 +150,7 @@ class FriendsService(
             firstUserUniqueName = firstUser.userUniqueName,
             secondUserUniqueName = secondUser.userUniqueName,
             firstUserLastOnlineTime = firstUser.lastOnlineTime,
-            secondUserLastOnlineTime = secondUser.lastOnlineTime
-        ))
-
-        // cохраняем действия добавления в друзья
-        friendsActionsRepository.save(FriendsActionsEntity(
-            firstUserId = firstId,
-            secondUserId = secondId,
-            firstUserName = firstUser.name,
-            secondUserName = secondUser.name,
-            firstUserUniqueName = firstUser.userUniqueName,
-            secondUserUniqueName = secondUser.userUniqueName,
-            actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
-            actionType = FriendsActionType.ADD,
-            firstUserLastOnlineTime = firstUser.lastOnlineTime,
-            secondUserLastOnlineTime = secondUser.lastOnlineTime
+            secondUserLastOnlineTime = secondUser.lastOnlineTime,
         ))
     }
 
@@ -216,7 +169,9 @@ class FriendsService(
                 userId = senderUserId,
                 userName = senderUserName,
                 userUniqueName = senderUniqueName,
-                isRequestSender = request.actorId == senderUserId
+                isRequestSender = request.actorId == senderUserId,
+                updateTime = request.updateTime,
+                deleted = request.deleted
             )
         }
     }
@@ -227,33 +182,19 @@ class FriendsService(
         val ids = AlineTwoLongsIds.aline(userId, requestFrom)
         val firstId = ids.first
         val secondId = ids.second
-        friendRequestRepository.deleteByFirstUserIdAndSecondUserId(firstId, secondId)
-
-        val firstUser = userRepository.findById(firstId).get()
-        val secondUser = userRepository.findById(secondId).get()
-
-        // сохраняем действие удаления заявки
-        friendsRequestsActionsRepository.save(FriendsRequestsActionsEntity(
-            firstUserId = firstId,
-            firstUserName = firstUser.name,
-            firstUserUniqueName = firstUser.userUniqueName,
-            secondUserId = secondId,
-            secondUserName = secondUser.name,
-            secondUserUniqueName = secondUser.userUniqueName,
-            actorId = userId,
-            actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
-            actionType = FriendsActionType.DELETE
-        ))
+        deleteFriendRequest(firstId, secondId)
     }
 
     fun findUsers(userId: Long, name: String): List<FriendDto> {
         val users = userRepository.findCandidateFriends(name, userId, Pageable.ofSize(10))
         return users.map { user ->
-            FriendDto(
+            FriendDto( // тут вообще должен быть пользователь просто
                 id = user.id!!,
                 name = user.name,
                 uniqueName = user.userUniqueName,
-                lastOnlineTime = user.lastOnlineTime.toEpochSecond(ZoneOffset.UTC)
+                lastOnlineTime = user.lastOnlineTime.toEpochSecond(ZoneOffset.UTC),
+                updateTime = 0,
+                deleted = false
             )
         }
     }

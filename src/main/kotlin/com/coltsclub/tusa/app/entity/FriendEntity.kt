@@ -17,6 +17,8 @@ data class FriendEntity(
     var secondUserUniqueName: String?,
     var firstUserLastOnlineTime: LocalDateTime,
     var secondUserLastOnlineTime: LocalDateTime,
+    var updateTime: Long = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
+    var deleted: Boolean = false
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

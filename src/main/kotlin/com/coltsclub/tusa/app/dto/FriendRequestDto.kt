@@ -7,5 +7,7 @@ data class FriendRequestDto(
     val userId: Long,
     val userName: String,
     val userUniqueName: String?,
-    val isRequestSender: Boolean
+    val isRequestSender: Boolean,
+    val updateTime: Long,
+    val deleted: Boolean
 )

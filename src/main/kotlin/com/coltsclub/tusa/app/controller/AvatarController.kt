@@ -1,14 +1,9 @@
 package com.coltsclub.tusa.app.controller
 
-import com.coltsclub.tusa.app.entity.AvatarActionType
-import com.coltsclub.tusa.app.entity.AvatarActionsEntity
 import com.coltsclub.tusa.app.entity.AvatarEntity
-import com.coltsclub.tusa.app.repository.AvatarActionsRepository
 import com.coltsclub.tusa.app.repository.AvatarRepository
 import com.coltsclub.tusa.core.exceptions.TucikBadRequest
 import com.coltsclub.tusa.core.socket.WebSocketHandler
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.PathVariable
@@ -19,7 +14,6 @@ import org.springframework.web.multipart.MultipartFile
 @RestController
 class AvatarController(
     val avatarRepository: AvatarRepository,
-    val avatarActionsRepository: AvatarActionsRepository,
     val webSocketHandler: WebSocketHandler
 ) {
     @PostMapping("api/v1/avatar", consumes = ["multipart/form-data"])
@@ -48,15 +42,6 @@ class AvatarController(
         )
         avatarRepository.save(entity)
 
-        // сохраняем действие смены аватарки
-        avatarActionsRepository.save(
-            AvatarActionsEntity(
-                ownerId = userId,
-                actionType = AvatarActionType.CHANGE,
-                actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
-            )
-        )
-
-        webSocketHandler.sendToFriendsAvatarUpdated(userId)
+        webSocketHandler.sendToFriendsAvatarUpdated(entity)
     }
 }

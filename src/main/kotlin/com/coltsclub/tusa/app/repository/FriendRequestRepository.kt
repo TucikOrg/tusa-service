@@ -9,5 +9,9 @@ interface FriendRequestRepository : JpaRepository<FriendRequestEntity, Long> {
     fun findByFirstUserIdAndSecondUserId(firstUserId: Long, secondUserId: Long): FriendRequestEntity?
     fun findByFirstUserIdOrSecondUserId(firstUserId: Long, secondUserId: Long): List<FriendRequestEntity>
 
-    fun deleteByFirstUserIdAndSecondUserId(firstUserId: Long, secondUserId: Long): Int
+    fun findAllByFirstUserIdOrSecondUserIdAndUpdateTimeGreaterThan(
+        firstUserId: Long,
+        secondUserId: Long,
+        updateTime: Long
+    ): List<FriendRequestEntity>
 }

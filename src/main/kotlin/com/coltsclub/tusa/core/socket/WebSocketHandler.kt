@@ -2,14 +2,14 @@ package com.coltsclub.tusa.core.socket
 
 import com.coltsclub.tusa.app.handlers.ChatBinaryHandler
 import com.coltsclub.tusa.app.dto.AddLocationDto
-import com.coltsclub.tusa.app.dto.AvatarAction
 import com.coltsclub.tusa.app.dto.AvatarDTO
+import com.coltsclub.tusa.app.dto.AvatarForCheck
 import com.coltsclub.tusa.app.dto.ImageDto
 import com.coltsclub.tusa.app.dto.IsOnlineDto
+import com.coltsclub.tusa.app.entity.AvatarEntity
 import com.coltsclub.tusa.app.handlers.AdminBinaryHandler
 import com.coltsclub.tusa.app.handlers.FriendsBinaryHandler
 import com.coltsclub.tusa.app.handlers.full.FriendsHandlerFull
-import com.coltsclub.tusa.app.repository.AvatarActionsRepository
 import com.coltsclub.tusa.app.service.FriendsService
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.app.service.AvatarService
@@ -19,6 +19,8 @@ import com.coltsclub.tusa.app.service.ProfileService
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
@@ -41,11 +43,10 @@ class WebSocketHandler(
     private val adminBinaryHandler: AdminBinaryHandler,
     private val friendsBinaryHandler: FriendsBinaryHandler,
     private val friendsHandlerFull: FriendsHandlerFull,
-    private val avatarsActionsRepository: AvatarActionsRepository,
     private val imageService: ImageService
 ) : BinaryWebSocketHandler() {
-    private val sessions = ConcurrentHashMap<Long, MutableList<WebSocketSession>>()
-    private val closingSessions = ConcurrentHashMap<String, Unit>()
+    private val sessions = ConcurrentHashMap<Long, MutableList<TucikSession>>()
+    private val closingSessions = ConcurrentHashMap<String, Unit>() // список сессий которые мы уже закрываем
     private val logger = org.slf4j.LoggerFactory.getLogger(WebSocketHandler::class.java)
 
     init {
@@ -64,6 +65,12 @@ class WebSocketHandler(
         friendsHandlerFull.sessionsContains = { userId ->
             sessionsContains(userId)
         }
+
+        // Запускаем задачу для проверки heartbeat
+        val executor = Executors.newSingleThreadScheduledExecutor()
+        executor.scheduleAtFixedRate({
+            checkHeartbeats()
+        }, 0, 10, TimeUnit.SECONDS) // Проверяем каждые 10 секунд
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -87,10 +94,10 @@ class WebSocketHandler(
         removeClosedSessionsOfUser(user.id!!)
         var sessionList = sessions[user.id]
         if (sessionList == null) {
-            sessionList =  mutableListOf(session)
+            sessionList =  mutableListOf(TucikSession(session))
             sessions[user.id] = sessionList
         } else {
-            sessionList.add(session)
+            sessionList.add(TucikSession(session))
         }
 
         // отправляем всем друзьям информацию что пользователь онлайн
@@ -106,14 +113,18 @@ class WebSocketHandler(
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
+        sessionDisconnected(session, status)
+    }
+
+    private fun sessionDisconnected(session: WebSocketSession, status: CloseStatus) {
         closingSessions.remove(session.id)
-        val user = try {session.user()} catch (e: Exception) {
+        val user = try { session.user() } catch (e: Exception) {
             logger.error("Connection closed. Code: ${status.code}")
 
             // Ищем сессию проходя по всем сессиям
             // Потому что найти ее быстро по пользователю не получится
             sessions.forEach { (userId, sessionList) ->
-                sessionList.remove(session)
+                sessionList.removeIf { it.webSocketSession == session }
             }
 
             return
@@ -121,7 +132,7 @@ class WebSocketHandler(
 
         // Удаляем сессию из списка сессий пользователя
         val sessionList = sessions[user.id!!]
-        sessionList?.remove(session)
+        sessionList?.removeIf { it.webSocketSession == session }
         val remainSessions = sessionList?.size?: -1
 
         // отправляем всем друзьям информацию что пользователь оффлайн
@@ -135,17 +146,48 @@ class WebSocketHandler(
         logger.info("Connection closed. User: ${user.id}. Remains user sessions: $remainSessions")
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun checkHeartbeats() {
+        val currentTime = System.currentTimeMillis()
+        val timeout = 20_000 // 30 секунд таймаут
+
+        sessions.forEach { (userId, sessions) ->
+            sessions.forEach { session ->
+                if (currentTime - session.lastResponseTime > timeout) {
+                    // Клиент не отвечает слишком долго — закрываем сессию
+                    logger.info("User: $userId don't ask on ping too long, closing session")
+                    session.webSocketSession.close()
+                    sessions.remove(session)
+                } else {
+                    try {
+                        // Отправляем пинг
+                        val response = Cbor.encodeToByteArray(SocketBinaryMessage("ping", byteArrayOf()))
+                        session.webSocketSession.sendMessage(BinaryMessage(response))
+                    } catch (e: Exception) {
+                        println("There is error on ping sending, UserId: $userId ${e.message}")
+                        session.webSocketSession.close()
+                        sessions.remove(session)
+                    }
+                }
+            }
+        }
+    }
+
     fun sendLocationToFriends(userId: Long, addLocationDto: AddLocationDto) {
         friendsHandlerFull.sendLocationsToFriends(userId, addLocationDto)
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    fun sendToFriendsAvatarUpdated(userId: Long) {
-        val friends = friendsService.getFriends(userId)
+    fun sendToFriendsAvatarUpdated(avatar: AvatarEntity) {
+        val friends = friendsService.getFriends(avatar.ownerId)
         val ids = friends.map { it.id }
         ids.forEach { friendId ->
-            val refreshAvatars = Cbor.encodeToByteArray(SocketBinaryMessage("refresh-avatars", Cbor.encodeToByteArray(
-                LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC) // отправляем серверное текущее время для сохранения временной точки синхронизации
+            val refreshAvatars = Cbor.encodeToByteArray(SocketBinaryMessage("avatar", Cbor.encodeToByteArray(
+                AvatarDTO(
+                    ownerId = avatar.ownerId,
+                    avatar = avatar.avatar,
+                    updatingTime = avatar.creation
+                )
             )))
             sendToSessionsOf(friendId, BinaryMessage(refreshAvatars))
         }
@@ -181,6 +223,12 @@ class WebSocketHandler(
 
 
         when (socketMessage.type) {
+            "pong" -> {
+                // обновляем время последнего пинга сессии
+                // сессия жива
+                val tucikSession = sessions[user.id]?.find { it.webSocketSession == session }
+                tucikSession?.lastResponseTime = System.currentTimeMillis()
+            }
             "request-online-friends" -> {
                 // запросить статус онлайн друзей
                 val friends = friendsService.getFriends(user.id!!)
@@ -237,24 +285,21 @@ class WebSocketHandler(
                 // загрузить автарку любого пользователя
                 val id = Cbor.decodeFromByteArray<Long>(socketMessage.data)
                 val avatar = avatarService.getAvatarImage(id)
-                val avatarDto = AvatarDTO(id, avatar)
+                val avatarDto = AvatarDTO(id, avatar, LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC))
                 val encoded: ByteArray = Cbor.encodeToByteArray<AvatarDTO>(avatarDto)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("avatar", encoded))
                 session.sendMessage(BinaryMessage(response))
             }
-            "avatars-actions" -> {
-                val timePoint = Cbor.decodeFromByteArray<Long>(socketMessage.data)
-                val friends = friendsService.getFriends(user.id!!)
-                val ids = friends.map { it.id }
-                val actions = avatarsActionsRepository.findAllByOwnerIdInAndActionTimeGreaterThan(ids, timePoint)
-                val dto = actions.map {
-                    AvatarAction(
-                        ownerId = it.ownerId,
-                        actionType = it.actionType,
-                        actionTime = it.actionTime
-                    )
+            "avatars-refresh" -> {
+                val avatarsForCheck = Cbor.decodeFromByteArray<List<AvatarForCheck>>(socketMessage.data)
+                val updatedAvatar = avatarService.getUpdatedAvatars(avatarsForCheck)
+                // отправляем все обновленные аватарки
+                for (avatar in updatedAvatar) {
+                    val avatarDto = AvatarDTO(avatar.ownerId, avatar.avatar, avatar.creation)
+                    val encoded: ByteArray = Cbor.encodeToByteArray<AvatarDTO>(avatarDto)
+                    val response = Cbor.encodeToByteArray(SocketBinaryMessage("avatar", encoded))
+                    session.sendMessage(BinaryMessage(response))
                 }
-                session.sendMessage(BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("avatars-actions", Cbor.encodeToByteArray(dto)))))
             }
             "find-users" -> {
                 // найти пользователей по имени
@@ -271,9 +316,9 @@ class WebSocketHandler(
         val sessionList = sessions[userId]
         var sentCount = 0
         sessionList?.forEach { session ->
-            if (session.isOpen) {
+            if (session.webSocketSession.isOpen) {
                 sentCount++
-                session.sendMessage(binaryMessage)
+                session.webSocketSession.sendMessage(binaryMessage)
             } else {
                 sessionList.remove(session)
             }
@@ -299,7 +344,7 @@ class WebSocketHandler(
 
     fun removeClosedSessionsOfUser(userId: Long) {
         val sessionList = sessions[userId]
-        sessionList?.removeIf { !it.isOpen }
+        sessionList?.removeIf { !it.webSocketSession.isOpen }
     }
 
     fun WebSocketSession.user(): UserEntity {

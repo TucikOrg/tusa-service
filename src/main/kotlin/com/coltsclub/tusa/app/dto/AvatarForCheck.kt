@@ -3,8 +3,7 @@ package com.coltsclub.tusa.app.dto
 import kotlinx.serialization.Serializable
 
 @Serializable
-class AvatarDTO(
+data class AvatarForCheck(
     val ownerId: Long,
-    val avatar: ByteArray?,
     val updatingTime: Long
 )
