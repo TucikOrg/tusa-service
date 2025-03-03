@@ -17,8 +17,9 @@ class MessageEntity(
     val message: String,
     @Column(unique = true)
     val temporaryId: String,
-    val creation: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC),
-    val payload: List<String>
+    val payload: List<String>,
+    val updateTime: Long = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC),
+    var deleted: Boolean
 ) {
     @Id
     @GeneratedValue(strategy= GenerationType.AUTO)

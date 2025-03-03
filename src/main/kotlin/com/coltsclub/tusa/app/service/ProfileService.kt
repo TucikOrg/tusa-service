@@ -1,10 +1,7 @@
 package com.coltsclub.tusa.app.service
 
-import com.coltsclub.tusa.app.entity.ChatsActionType
-import com.coltsclub.tusa.app.entity.ChatsActionsEntity
 import com.coltsclub.tusa.app.entity.FriendEntity
 import com.coltsclub.tusa.app.repository.ChatRepository
-import com.coltsclub.tusa.app.repository.ChatsActionsRepository
 import com.coltsclub.tusa.app.repository.FriendRepository
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.core.enums.Role
@@ -27,7 +24,6 @@ import org.springframework.web.socket.BinaryMessage
 class ProfileService(
     private val userRepository: UserRepository,
     private val friendsRepository: FriendRepository,
-    private val chatsActionsRepository: ChatsActionsRepository,
     private val chatRepository: ChatRepository
 ) {
     fun getUsers(uniqueName: String, page: Pageable): Page<UserEntity> {
@@ -45,13 +41,14 @@ class ProfileService(
         userRepository.save(user)
 
         // изменяем чаты
-        val chats = chatRepository.findByFirstUserIdOrSecondUserId(userId, userId, Pageable.unpaged())
+        val chats = chatRepository.findByFirstUserIdOrSecondUserIdAndDeleted(userId, userId, Pageable.unpaged(), deleted = false)
         for (chat in chats) {
             if (chat.firstUserId == userId) {
                 chat.firsUserName = name
             } else {
                 chat.secondUserName = name
             }
+            chat.updateTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
         }
         chatRepository.saveAll(chats)
 
@@ -65,46 +62,11 @@ class ProfileService(
             friend.updateTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
         }
         friendsRepository.saveAll(friends)
-
-
-        // теперь нужно имена в чатах обновить
-        val chatChangeActions = mutableListOf<ChatsActionsEntity>()
-        for (friend in friends) {
-            val firstId = friend.firstUserId
-            val secondId = friend.secondUserId
-
-            // есть ли чат между этими пользователями
-            val chat = chats.firstOrNull { it.firstUserId == firstId && it.secondUserId == secondId } ?: continue
-
-            var useFirstUserName = chat.firsUserName
-            var useSecondUserName = chat.secondUserName
-            if (userId == firstId) {
-                useFirstUserName = name
-            } else {
-                useSecondUserName = name
-            }
-
-            val changeChatAction = ChatsActionsEntity(
-                chatId = chat.id!!,
-                firstUserId = firstId,
-                secondUserId = secondId,
-                firsUserName = useFirstUserName,
-                secondUserName = useSecondUserName,
-                firstUserUniqueName = chat.firstUserUniqueName,
-                secondUserUniqueName = chat.secondUserUniqueName,
-                actionType = ChatsActionType.CHANGE,
-                actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
-            )
-            chatChangeActions.add(changeChatAction)
-        }
-
-        // сохраняем изменения (имени) для чатов
-        chatsActionsRepository.saveAll(chatChangeActions)
     }
 
     @OptIn(ExperimentalSerializationApi::class)
     fun changeName(userId: Long, name: String, sendToSessionsOf: (Long, BinaryMessage) -> Int) {
-        val friends = friendsRepository.findByFirstUserIdOrSecondUserId(userId, userId)
+        val friends = friendsRepository.findByFirstUserIdOrSecondUserIdAndDeleted(userId, userId, deleted = false)
         changeNameTransactional(userId, name, friends)
 
         // отправляем изменения друзьям
@@ -137,13 +99,14 @@ class ProfileService(
         userRepository.save(user)
 
         // изменяем чаты
-        val chats = chatRepository.findByFirstUserIdOrSecondUserId(userId, userId, Pageable.unpaged())
+        val chats = chatRepository.findByFirstUserIdOrSecondUserIdAndDeleted(userId, userId, Pageable.unpaged(), deleted = false)
         for (chat in chats) {
             if (chat.firstUserId == userId) {
                 chat.firstUserUniqueName = newUniqueName
             } else {
                 chat.secondUserUniqueName = newUniqueName
             }
+            chat.updateTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
         }
         chatRepository.saveAll(chats)
 
@@ -157,41 +120,6 @@ class ProfileService(
             friend.updateTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
         }
         friendsRepository.saveAll(friends)
-
-
-        // теперь нужно имена в чатах обновить
-        val chatChangeActions = mutableListOf<ChatsActionsEntity>()
-        for (friend in friends) {
-            val firstId = friend.firstUserId
-            val secondId = friend.secondUserId
-
-            // есть ли чат между этими пользователями
-            val chat = chats.firstOrNull { it.firstUserId == firstId && it.secondUserId == secondId } ?: continue
-
-            var useFirstUserUniqueName = chat.firstUserUniqueName
-            var useSecondUserUniqueName = chat.secondUserUniqueName
-            if (userId == firstId) {
-                useFirstUserUniqueName = newUniqueName
-            } else {
-                useSecondUserUniqueName = newUniqueName
-            }
-
-            val changeChatAction = ChatsActionsEntity(
-                chatId = chat.id!!,
-                firstUserId = firstId,
-                secondUserId = secondId,
-                firsUserName = chat.firsUserName,
-                secondUserName = chat.secondUserName,
-                firstUserUniqueName = useFirstUserUniqueName,
-                secondUserUniqueName = useSecondUserUniqueName,
-                actionType = ChatsActionType.CHANGE,
-                actionTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
-            )
-            chatChangeActions.add(changeChatAction)
-        }
-
-        // сохраняем изменения (уникальных имен) для чатов
-        chatsActionsRepository.saveAll(chatChangeActions)
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -202,7 +130,7 @@ class ProfileService(
             return false
         }
 
-        val friends = friendsRepository.findByFirstUserIdOrSecondUserId(userId, userId)
+        val friends = friendsRepository.findByFirstUserIdOrSecondUserIdAndDeleted(userId, userId, deleted = false)
         changeUniqueNameTransactional(userId, newUniqueName, friends)
 
         // отправляем изменения друзьям
@@ -267,7 +195,7 @@ class ProfileService(
 
     @OptIn(ExperimentalSerializationApi::class)
     fun updateLastOnlineTime(userId: Long, lastOnlineTile: LocalDateTime, sendToSessionsOf: (Long, BinaryMessage) -> kotlin.Int) {
-        val friends = friendsRepository.findByFirstUserIdOrSecondUserId(userId, userId)
+        val friends = friendsRepository.findByFirstUserIdOrSecondUserIdAndDeleted(userId, userId, deleted = false)
         updateLastOnlineTimeTransactional(userId, lastOnlineTile, friends)
 
         // отправляем изменения друзьям

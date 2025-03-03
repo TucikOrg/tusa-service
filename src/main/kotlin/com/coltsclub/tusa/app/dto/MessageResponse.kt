@@ -10,6 +10,7 @@ data class MessageResponse(
     var secondUserId: Long,
     var senderId: Long,
     val message: String,
-    val creation: Long,
     val payload: String,
+    val updateTime: Long,
+    val deleted: Boolean
 )

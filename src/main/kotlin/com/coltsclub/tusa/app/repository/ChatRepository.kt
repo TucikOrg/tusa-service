@@ -9,10 +9,22 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface ChatRepository: CrudRepository<ChatEntity, Long> {
-    fun findByFirstUserIdOrSecondUserId(firstUserId: Long, secondUserId: Long, pageable: Pageable): Page<ChatEntity>
-
     @Query("SELECT COUNT(c) FROM chat c WHERE (c.firstUserId = :firstUserId AND c.secondUserId = :secondUserId) OR (c.firstUserId = :secondUserId AND c.secondUserId = :firstUserId)")
     fun countChats(firstUserId: Long, secondUserId: Long): Long
-    fun deleteByFirstUserIdAndSecondUserId(firstId: Long, secondId: Long)
     fun findByFirstUserIdAndSecondUserId(firstId: Long, secondId: Long): ChatEntity?
+
+    @Query("SELECT c FROM chat c WHERE (c.firstUserId = :firstUserId OR c.secondUserId = :secondUserId) AND c.updateTime > :updateTime")
+    fun findAllByFirstUserIdOrSecondUserIdAndUpdateTimeGreaterThan(
+        firstUserId: Long,
+        secondUserId: Long,
+        updateTime: Long
+    ): List<ChatEntity>
+
+    @Query("SELECT c FROM chat c WHERE (c.firstUserId = :firstUserId OR c.secondUserId = :secondUserId) AND c.deleted = :deleted")
+    fun findByFirstUserIdOrSecondUserIdAndDeleted(
+        firstUserId: kotlin.Long,
+        secondUserId: kotlin.Long,
+        pageable: org.springframework.data.domain.Pageable,
+        deleted: kotlin.Boolean
+    ): Page<ChatEntity>
 }

@@ -6,12 +6,17 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 
 interface FriendRequestRepository : JpaRepository<FriendRequestEntity, Long> {
-    fun findByFirstUserIdAndSecondUserId(firstUserId: Long, secondUserId: Long): FriendRequestEntity?
-    fun findByFirstUserIdOrSecondUserId(firstUserId: Long, secondUserId: Long): List<FriendRequestEntity>
-
+    @Query("SELECT f FROM friendRequest f WHERE (f.firstUserId = :firstUserId OR f.secondUserId = :secondUserId) AND f.updateTime > :updateTime")
     fun findAllByFirstUserIdOrSecondUserIdAndUpdateTimeGreaterThan(
         firstUserId: Long,
         secondUserId: Long,
         updateTime: Long
     ): List<FriendRequestEntity>
+
+    fun findByFirstUserIdAndSecondUserIdAndDeleted(
+        firstUserId: kotlin.Long, secondUserId: kotlin.Long, deleted: kotlin.Boolean
+    ) : FriendRequestEntity?
+
+    @Query("SELECT f FROM friendRequest f WHERE (f.firstUserId = :firstUserId OR f.secondUserId = :secondUserId) AND f.deleted = :deleted")
+    fun findByFirstUserIdOrSecondUserIdAndDeleted(firstUserId: kotlin.Long, secondUserId: kotlin.Long, deleted: kotlin.Boolean) : List<FriendRequestEntity>
 }

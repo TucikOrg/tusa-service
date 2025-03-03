@@ -182,14 +182,14 @@ class WebSocketHandler(
         val friends = friendsService.getFriends(avatar.ownerId)
         val ids = friends.map { it.id }
         ids.forEach { friendId ->
-            val refreshAvatars = Cbor.encodeToByteArray(SocketBinaryMessage("avatar", Cbor.encodeToByteArray(
+            val avatarNew = Cbor.encodeToByteArray(SocketBinaryMessage("avatar", Cbor.encodeToByteArray(
                 AvatarDTO(
                     ownerId = avatar.ownerId,
                     avatar = avatar.avatar,
                     updatingTime = avatar.creation
                 )
             )))
-            sendToSessionsOf(friendId, BinaryMessage(refreshAvatars))
+            sendToSessionsOf(friendId, BinaryMessage(avatarNew))
         }
     }
 

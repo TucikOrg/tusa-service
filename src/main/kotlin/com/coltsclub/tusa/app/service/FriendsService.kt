@@ -21,7 +21,7 @@ class FriendsService(
     private val userRepository: UserRepository,
 ) {
     fun getFriends(userId: Long): List<FriendDto> {
-        val friends = friendRepository.findByFirstUserIdOrSecondUserId(userId, userId)
+        val friends = friendRepository.findByFirstUserIdOrSecondUserIdAndDeleted(userId, userId, deleted = false)
         return friends.map { user ->
             var friendId = user.firstUserId
             var friendName = user.firstUserName
@@ -61,7 +61,9 @@ class FriendsService(
 
         // Проверяем существует ли заявка в друзья
         // если заявка уже отправлена то ничего не делаем
-        val friendRequest = friendRequestRepository.findByFirstUserIdAndSecondUserId(firstId, secondId)
+        val friendRequest = friendRequestRepository.findByFirstUserIdAndSecondUserIdAndDeleted(firstId, secondId,
+            deleted = false
+        )
         if (friendRequest != null) {
             return emptyList()
         }
@@ -103,7 +105,9 @@ class FriendsService(
         val ids = AlineTwoLongsIds.aline(userId, deleteFriend)
         val firstId = ids.first
         val secondId = ids.second
-        friendRepository.findByFirstUserIdAndSecondUserId(secondId, firstId)?.let {
+        friendRepository.findByFirstUserIdAndSecondUserIdAndDeleted(firstId, secondId,
+            deleted = false
+        )?.let {
             it.deleted = true
             it.updateTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
             friendRepository.save(it)
@@ -114,12 +118,14 @@ class FriendsService(
         val ids = AlineTwoLongsIds.aline(userId, withUserId)
         val firstId = ids.first
         val secondId = ids.second
-        val friendRow = friendRepository.findByFirstUserIdAndSecondUserId(firstId, secondId)
+        val friendRow = friendRepository.findByFirstUserIdAndSecondUserIdAndDeleted(firstId, secondId,
+            deleted = false
+        )
         return friendRow != null
     }
 
     fun deleteFriendRequest(firstId: Long, secondId: Long): FriendRequestEntity? {
-        val request = friendRequestRepository.findByFirstUserIdAndSecondUserId(firstId, secondId)
+        val request = friendRequestRepository.findByFirstUserIdAndSecondUserIdAndDeleted(firstId, secondId, deleted = false)
         if (request != null) {
             request.deleted = true
             request.updateTime = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
@@ -155,7 +161,7 @@ class FriendsService(
     }
 
     fun getToMeRequests(userId: Long): List<FriendRequestDto> {
-        val requests = friendRequestRepository.findByFirstUserIdOrSecondUserId(userId, userId)
+        val requests = friendRequestRepository.findByFirstUserIdOrSecondUserIdAndDeleted(userId, userId, deleted = false)
         return requests.map { request ->
             var senderUserId = request.firstUserId
             var senderUserName = request.firstUserName

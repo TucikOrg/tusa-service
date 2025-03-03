@@ -11,4 +11,6 @@ data class ChatResponse(
     val secondUserName: String,
     val firstUserUniqueName: String?,
     val secondUserUniqueName: String?,
+    val updateTime: Long,
+    val deleted: Boolean
 )

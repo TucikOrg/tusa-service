@@ -112,7 +112,7 @@ class ChatBinaryHandler(
             "messages" -> {
                 // получаем страницу сообщений
                 val requestMessages = Cbor.decodeFromByteArray<RequestMessages>(socketMessage.data)
-                val pageable = PageRequest.of(requestMessages.page, requestMessages.size, Sort.by(Sort.Direction.DESC, "creation"))
+                val pageable = PageRequest.of(requestMessages.page, requestMessages.size, Sort.by(Sort.Direction.DESC, "updateTime"))
                 val messages = messagesService.getMessages(
                     userId = user.id!!,
                     withUserId = requestMessages.withUserId,
@@ -126,9 +126,10 @@ class ChatBinaryHandler(
                         secondUserId = it.secondUserId,
                         senderId = it.senderId,
                         message = it.message,
-                        creation = it.creation.toEpochSecond(ZoneOffset.UTC),
+                        updateTime = it.updateTime,
                         temporaryId = it.temporaryId,
                         payload = it.payload.joinToString(separator = ","),
+                        deleted = it.deleted
                     )
                 }
                 val data = Cbor.encodeToByteArray(
@@ -157,7 +158,9 @@ class ChatBinaryHandler(
                         firsUserName = chat.firsUserName,
                         secondUserName = chat.secondUserName,
                         firstUserUniqueName = chat.firstUserUniqueName,
-                        secondUserUniqueName = chat.secondUserUniqueName
+                        secondUserUniqueName = chat.secondUserUniqueName,
+                        updateTime = chat.updateTime,
+                        deleted = chat.deleted
                     )
                 }
                 val chatsResponse = ChatsResponse(
