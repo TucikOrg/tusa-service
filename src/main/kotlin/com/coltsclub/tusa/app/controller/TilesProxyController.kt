@@ -2,6 +2,7 @@ package com.coltsclub.tusa.app.controller
 
 import java.net.URL
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -25,6 +26,9 @@ class TilesProxyController {
         cache["$zoom/$x/$y"]?.let {
             return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/vnd.mapbox-vector-tile"))
+                .headers(HttpHeaders().apply {
+                    add("Content-Encoding", "gzip")
+                })
                 .body(it)
         }
 
@@ -37,6 +41,9 @@ class TilesProxyController {
 
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType("application/vnd.mapbox-vector-tile"))
+            .headers(HttpHeaders().apply {
+                add("Content-Encoding", "gzip")
+            })
             .body(tileBytes)
     }
 }
