@@ -17,7 +17,8 @@ class PushNotificationService(
         try {
             val message = Message.builder()
                 .setToken(token)
-                .setNotification(Notification.builder().setTitle(title).setBody(body).build())
+                .putData("title", title) // Передаём title как данные
+                .putData("body", body)   // Передаём body как данные
                 .build()
 
             FirebaseMessaging.getInstance().send(message)

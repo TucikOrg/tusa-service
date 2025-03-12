@@ -46,26 +46,12 @@ class WebSocketHandler(
     private val imageService: ImageService
 ) : BinaryWebSocketHandler() {
     private val sessions = ConcurrentHashMap<Long, MutableList<TucikSession>>()
-    private val closingSessions = ConcurrentHashMap<String, Unit>() // список сессий которые мы уже закрываем
+
+    // только если хотим разлогинить пользователя
+    private val closingSessions = ConcurrentHashMap<String, Unit>() // список сессий которые мы уже закрываем потому что нужно разлогинить пользователя
     private val logger = org.slf4j.LoggerFactory.getLogger(WebSocketHandler::class.java)
 
     init {
-        chatBinaryHandler.sendToSessionsOf = { userId, message ->
-            sendToSessionsOf(userId, message)
-        }
-        adminBinaryHandler.sendToSessionsOf = { userId, message ->
-            sendToSessionsOf(userId, message)
-        }
-        friendsBinaryHandler.sendToSessionsOf = { userId, message ->
-            sendToSessionsOf(userId, message)
-        }
-        friendsHandlerFull.sendToSessionsOf = { userId, message ->
-            sendToSessionsOf(userId, message)
-        }
-        friendsHandlerFull.sessionsContains = { userId ->
-            sessionsContains(userId)
-        }
-
         // Запускаем задачу для проверки heartbeat
         val executor = Executors.newSingleThreadScheduledExecutor()
         executor.scheduleAtFixedRate({
@@ -82,8 +68,10 @@ class WebSocketHandler(
                 return null
             }
             closingSessions[session.id] = Unit
+            // закроет сессию клиент
+            // закрываем потому что тоен невалидный
             val response = Cbor.encodeToByteArray(SocketBinaryMessage("closed", Cbor.encodeToByteArray("Token invalid!")))
-            session.sendMessage(BinaryMessage(response))
+            sendMessageValidation(session, BinaryMessage(response))
             return null
         }
     }
@@ -135,13 +123,17 @@ class WebSocketHandler(
         sessionList?.removeIf { it.webSocketSession == session }
         val remainSessions = sessionList?.size?: -1
 
-        // отправляем всем друзьям информацию что пользователь оффлайн
-        sendToFriendsIAmOnline(user.id, online = false)
+        // если сессий нет значит пользователь оффлайн
+        if (remainSessions == 0 || remainSessions == -1) {
+            // отправляем всем друзьям информацию что пользователь оффлайн
+            sendToFriendsIAmOnline(user.id, online = false)
 
-        // обновляем время последний раз в онлайне
-        profileService.updateLastOnlineTime(user.id, LocalDateTime.now(ZoneOffset.UTC)) { userId, msg ->
-            sendToSessionsOf(userId, msg)
+            // обновляем время последний раз в онлайне
+            profileService.updateLastOnlineTime(user.id, LocalDateTime.now(ZoneOffset.UTC)) { userId, msg ->
+                sendToSessionsOf(userId, msg)
+            }
         }
+
 
         logger.info("Connection closed. User: ${user.id}. Remains user sessions: $remainSessions")
     }
@@ -162,7 +154,7 @@ class WebSocketHandler(
                     try {
                         // Отправляем пинг
                         val response = Cbor.encodeToByteArray(SocketBinaryMessage("ping", byteArrayOf()))
-                        session.webSocketSession.sendMessage(BinaryMessage(response))
+                        sendMessageValidation(session.webSocketSession, BinaryMessage(response))
                     } catch (e: Exception) {
                         println("There is error on ping sending, UserId: $userId ${e.message}")
                         session.webSocketSession.close()
@@ -174,8 +166,10 @@ class WebSocketHandler(
     }
 
     fun sendLocationToFriends(userId: Long, addLocationDto: AddLocationDto) {
-        friendsHandlerFull.sendLocationsToFriends(userId, addLocationDto)
+        friendsHandlerFull.sendLocationsToFriends(userId, addLocationDto, webSocketHandler = this)
     }
+
+
 
     @OptIn(ExperimentalSerializationApi::class)
     fun sendToFriendsAvatarUpdated(avatar: AvatarEntity) {
@@ -203,7 +197,8 @@ class WebSocketHandler(
         chatBinaryHandler.handleBinaryMessage(
             socketMessage,
             user,
-            session
+            session,
+            webSocketHandler = this
         )
 
         // дейсвтия для тестирования
@@ -211,14 +206,16 @@ class WebSocketHandler(
         adminBinaryHandler.handleBinaryMessage(
             socketMessage = socketMessage,
             user = user,
-            session = session
+            session = session,
+            webSocketHandler = this
         )
 
         // друзья и заявки в друзья
         friendsBinaryHandler.handleBinaryMessage(
             socketMessage = socketMessage,
             user = user,
-            session = session
+            session = session,
+            webSocketHandler = this
         )
 
 
@@ -226,7 +223,7 @@ class WebSocketHandler(
             "pong" -> {
                 // обновляем время последнего пинга сессии
                 // сессия жива
-                val tucikSession = sessions[user.id]?.find { it.webSocketSession == session }
+                val tucikSession = sessions[user.id]?.find { it.webSocketSession.id == session.id }
                 tucikSession?.lastResponseTime = System.currentTimeMillis()
             }
             "request-online-friends" -> {
@@ -237,40 +234,43 @@ class WebSocketHandler(
                     val isFriendOnline = IsOnlineDto(userId = friendId, isOnline = sessions.containsKey(friendId))
                     val isFriendOnlineData = Cbor.encodeToByteArray(isFriendOnline)
                     val response = Cbor.encodeToByteArray(SocketBinaryMessage("is-online", isFriendOnlineData))
-                    session.sendMessage(BinaryMessage(response))
+                    sendMessageValidation(session, BinaryMessage(response))
                 }
             }
             "firebase-token" -> {
                 val token = Cbor.decodeFromByteArray<String>(socketMessage.data)
                 profileService.saveFirebaseToken(user.id!!, token)
             }
+            "set-me-location-visible" -> {
+                val visible = Cbor.decodeFromByteArray<Boolean>(socketMessage.data)
+                locationService.setVisibleLocationStateMe(user.id!!, visible)
+
+                // отправляем друзьям информацию о том что я включил/выключил видимость локации
+                friendsHandlerFull.sendMyLocationVisibleState(user.id, visible, webSocketHandler = this)
+            }
             "locations" -> {
                 // хочу получить локации друзей
                 val friends = friendsService.getFriends(user.id!!)
-                val locations = locationService.getUsersLocations(user.id, friends.map { it.id })
+                val locations = locationService.getUsersLocations(friends.map { it.id })
                 val data = Cbor.encodeToByteArray(locations)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("locations", data))
-                session.sendMessage(BinaryMessage(response))
+                sendMessageValidation(session, BinaryMessage(response))
             }
             "is-unique-name-available" -> {
                 val uniqueName = Cbor.decodeFromByteArray<String>(socketMessage.data)
                 val available = profileService.isUserUniqueNameAvailable(uniqueName)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("is-unique-name-available", Cbor.encodeToByteArray(available)))
-                session.sendMessage(BinaryMessage(response))
+                sendMessageValidation(session, BinaryMessage(response))
             }
             "change-name" -> {
                 val name = Cbor.decodeFromByteArray<String>(socketMessage.data)
-                profileService.changeName(user.id!!, name, sendToSessionsOf = { userId, msg ->
-                    sendToSessionsOf(userId, msg)
-                })
+                profileService.changeName(user.id!!, name, webSocketHandler = this)
             }
             "change-unique-name" -> {
                 val uniqueName = Cbor.decodeFromByteArray<String>(socketMessage.data)
-                val success = profileService.changeUniqueName(user.id!!, uniqueName) { userId, msg ->
-                    sendToSessionsOf(userId, msg)
-                }
+                val success = profileService.changeUniqueName(user.id!!, uniqueName, webSocketHandler = this)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("change-unique-name", Cbor.encodeToByteArray(success)))
-                session.sendMessage(BinaryMessage(response))
+                sendMessageValidation(session, BinaryMessage(response))
             }
             "image" -> {
                 // загрузить картинку любого пользователя
@@ -279,7 +279,7 @@ class WebSocketHandler(
                 val imageResponseDto = ImageDto(imageDto.ownerId, imageDto.localFilePathId, imageBytes)
                 val encoded: ByteArray = Cbor.encodeToByteArray<ImageDto>(imageResponseDto)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("image", encoded))
-                session.sendMessage(BinaryMessage(response))
+                sendMessageValidation(session, BinaryMessage(response))
             }
             "avatar" -> {
                 // загрузить автарку любого пользователя
@@ -288,7 +288,7 @@ class WebSocketHandler(
                 val avatarDto = AvatarDTO(id, avatar, LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC))
                 val encoded: ByteArray = Cbor.encodeToByteArray<AvatarDTO>(avatarDto)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("avatar", encoded))
-                session.sendMessage(BinaryMessage(response))
+                sendMessageValidation(session, BinaryMessage(response))
             }
             "avatars-refresh" -> {
                 val avatarsForCheck = Cbor.decodeFromByteArray<List<AvatarForCheck>>(socketMessage.data)
@@ -298,7 +298,7 @@ class WebSocketHandler(
                     val avatarDto = AvatarDTO(avatar.ownerId, avatar.avatar, avatar.creation)
                     val encoded: ByteArray = Cbor.encodeToByteArray<AvatarDTO>(avatarDto)
                     val response = Cbor.encodeToByteArray(SocketBinaryMessage("avatar", encoded))
-                    session.sendMessage(BinaryMessage(response))
+                    sendMessageValidation(session, BinaryMessage(response))
                 }
             }
             "find-users" -> {
@@ -307,7 +307,7 @@ class WebSocketHandler(
                 val users = friendsService.findUsers(user.id!!, name)
                 val data = Cbor.encodeToByteArray(users)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("find-users", data))
-                session.sendMessage(BinaryMessage(response))
+                sendMessageValidation(session, BinaryMessage(response))
             }
         }
     }
@@ -318,7 +318,7 @@ class WebSocketHandler(
         sessionList?.forEach { session ->
             if (session.webSocketSession.isOpen) {
                 sentCount++
-                session.webSocketSession.sendMessage(binaryMessage)
+                sendMessageValidation(session.webSocketSession, binaryMessage)
             } else {
                 sessionList.remove(session)
             }
@@ -349,5 +349,19 @@ class WebSocketHandler(
 
     fun WebSocketSession.user(): UserEntity {
         return (this.principal as UsernamePasswordAuthenticationToken).principal as UserEntity
+    }
+
+    fun sendMessageValidation(session: WebSocketSession, message: BinaryMessage) {
+        try {
+            if (session.isOpen) {
+                session.sendMessage(message)
+            }
+        } catch (e: Exception) {
+            logger.error("Error on sending message: ${e.message}")
+            if (e.message == "Broken pipe") {
+                // когда у клиента просто пропал интернет и мы пытаемся ему что-то отправить
+                sessionDisconnected(session, CloseStatus.GOING_AWAY)
+            }
+        }
     }
 }

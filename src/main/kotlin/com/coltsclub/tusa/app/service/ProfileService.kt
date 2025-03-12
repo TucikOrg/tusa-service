@@ -7,6 +7,7 @@ import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.core.enums.Role
 import com.coltsclub.tusa.core.repository.UserRepository
 import com.coltsclub.tusa.core.socket.SocketBinaryMessage
+import com.coltsclub.tusa.core.socket.WebSocketHandler
 import jakarta.transaction.Transactional
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -65,7 +66,7 @@ class ProfileService(
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    fun changeName(userId: Long, name: String, sendToSessionsOf: (Long, BinaryMessage) -> Int) {
+    fun changeName(userId: Long, name: String, webSocketHandler: WebSocketHandler) {
         val friends = friendsRepository.findByFirstUserIdOrSecondUserIdAndDeleted(userId, userId, deleted = false)
         changeNameTransactional(userId, name, friends)
 
@@ -75,7 +76,7 @@ class ProfileService(
             val refreshFriends = Cbor.encodeToByteArray(SocketBinaryMessage("refresh-friends", Cbor.encodeToByteArray(
                 byteArrayOf()
             )))
-            sendToSessionsOf(friendId, BinaryMessage(refreshFriends))
+            webSocketHandler.sendToSessionsOf(friendId, BinaryMessage(refreshFriends))
         }
 
         // отправляем изменения друзьям
@@ -84,7 +85,7 @@ class ProfileService(
             val refreshFriends = Cbor.encodeToByteArray(SocketBinaryMessage("refresh-chats", Cbor.encodeToByteArray(
                 byteArrayOf()
             )))
-            sendToSessionsOf(friendId, BinaryMessage(refreshFriends))
+            webSocketHandler.sendToSessionsOf(friendId, BinaryMessage(refreshFriends))
         }
     }
 
@@ -123,7 +124,7 @@ class ProfileService(
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    fun changeUniqueName(userId: Long, newUniqueName: String, sendToSessionsOf: (Long, BinaryMessage) -> Int): Boolean {
+    fun changeUniqueName(userId: Long, newUniqueName: String, webSocketHandler: WebSocketHandler): Boolean {
         // нельзя использовать занятые имена
         val exist = userRepository.findByUserUniqueName(newUniqueName).isPresent
         if (exist) {
@@ -139,7 +140,7 @@ class ProfileService(
             val refreshFriends = Cbor.encodeToByteArray(SocketBinaryMessage("refresh-friends", Cbor.encodeToByteArray(
                 byteArrayOf()
             )))
-            sendToSessionsOf(friendId, BinaryMessage(refreshFriends))
+            webSocketHandler.sendToSessionsOf(friendId, BinaryMessage(refreshFriends))
         }
 
         // отправляем изменения друзьям
@@ -148,7 +149,7 @@ class ProfileService(
             val refreshChats = Cbor.encodeToByteArray(SocketBinaryMessage("refresh-chats", Cbor.encodeToByteArray(
                 byteArrayOf()
             )))
-            sendToSessionsOf(friendId, BinaryMessage(refreshChats))
+            webSocketHandler.sendToSessionsOf(friendId, BinaryMessage(refreshChats))
         }
 
         return true

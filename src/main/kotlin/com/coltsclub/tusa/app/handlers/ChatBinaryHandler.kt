@@ -17,6 +17,7 @@ import com.coltsclub.tusa.app.service.MessagesService
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.core.service.PushNotificationService
 import com.coltsclub.tusa.core.socket.SocketBinaryMessage
+import com.coltsclub.tusa.core.socket.WebSocketHandler
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -24,6 +25,7 @@ import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import org.slf4j.LoggerFactory
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
@@ -36,14 +38,14 @@ class ChatBinaryHandler(
     private val chatService: ChatsService,
     private val pushNotificationService: PushNotificationService
 ) {
-    lateinit var sendToSessionsOf: (Long, BinaryMessage) -> Int
     private val logger = LoggerFactory.getLogger(ChatBinaryHandler::class.java)
 
     @OptIn(ExperimentalSerializationApi::class)
     fun handleBinaryMessage(
         socketMessage: SocketBinaryMessage,
         user: UserEntity,
-        session: WebSocketSession
+        session: WebSocketSession,
+        webSocketHandler: WebSocketHandler
     ) {
         when (socketMessage.type) {
             "writing-message" -> {
@@ -52,7 +54,7 @@ class ChatBinaryHandler(
                 writingMessageInput.fromUserId = user.id!!
                 val data = Cbor.encodeToByteArray(writingMessageInput)
                 val response = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("writing-message", data)))
-                sendToSessionsOf(writingMessageInput.toUserId, response)
+                webSocketHandler.sendToSessionsOf(writingMessageInput.toUserId, response)
             }
             "chats-actions" -> {
                 // получаем историю событий для и пользователя
@@ -64,7 +66,7 @@ class ChatBinaryHandler(
                 // отправляем историю действий запросившему пользователю
                 val data = Cbor.encodeToByteArray(actions)
                 val actionsBinary = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("chats-actions", data)))
-                session.sendMessage(actionsBinary)
+                webSocketHandler.sendMessageValidation(session, actionsBinary)
             }
             "messages-actions" -> {
                 // получаем историю с сообщениями для и пользователя
@@ -77,7 +79,7 @@ class ChatBinaryHandler(
                 // отправляем историю действий запросившему пользователю
                 val data = Cbor.encodeToByteArray(actions)
                 val actionsBinary = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("messages-actions", data)))
-                session.sendMessage(actionsBinary)
+                webSocketHandler.sendMessageValidation(session, actionsBinary)
             }
             "init-messages" -> {
                 val initMessengerRequest = Cbor.decodeFromByteArray<InitMessenger>(socketMessage.data)
@@ -92,7 +94,7 @@ class ChatBinaryHandler(
                 )
 
                 val initMessagesBinary = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("init-messages", data)))
-                session.sendMessage(initMessagesBinary)
+                webSocketHandler.sendMessageValidation(session, initMessagesBinary)
             }
             "init-chats" -> {
                 val initMessengerRequest = Cbor.decodeFromByteArray<InitMessenger>(socketMessage.data)
@@ -107,7 +109,7 @@ class ChatBinaryHandler(
                 )
 
                 val initMessagesBinary = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("init-chats", data)))
-                session.sendMessage(initMessagesBinary)
+                webSocketHandler.sendMessageValidation(session, initMessagesBinary)
             }
             "messages" -> {
                 // получаем страницу сообщений
@@ -141,7 +143,7 @@ class ChatBinaryHandler(
                 )
                 // отправляем ответ запросившему пользователю
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("messages", data))
-                session.sendMessage(BinaryMessage(response))
+                webSocketHandler.sendMessageValidation(session, BinaryMessage(response))
             }
             "chats" -> {
                 // ищем созданные чаты пользователя
@@ -172,12 +174,12 @@ class ChatBinaryHandler(
                 // отправляем ответ запросившему пользователю
                 val data = Cbor.encodeToByteArray(chatsResponse)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("chats", data))
-                session.sendMessage(BinaryMessage(response))
+                webSocketHandler.sendMessageValidation(session, BinaryMessage(response))
             }
             "send-message" -> {
-                // отправляем сообщение
                 val sendMessage = Cbor.decodeFromByteArray<SendMessage>(socketMessage.data)
                 try {
+                    // отправляем сообщение
                     val result = chatService.sendMessage(
                         userId = user.id!!,
                         toUserId = sendMessage.toId,
@@ -189,8 +191,8 @@ class ChatBinaryHandler(
                     // если чат был создан то уведомляем о том что нужно обновить состояние чатов
                     if (result.chatCreated) {
                         val refreshChats = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-chats", byteArrayOf())))
-                        sendToSessionsOf(sendMessage.toId, refreshChats)
-                        sendToSessionsOf(user.id, refreshChats)
+                        webSocketHandler.sendToSessionsOf(sendMessage.toId, refreshChats)
+                        webSocketHandler.sendToSessionsOf(user.id, refreshChats)
                     }
                 } catch (e: ChatUserDeletedException) {
                     // если например пользователь удален, а у первого остался чат то вылезет исключение
@@ -199,16 +201,18 @@ class ChatBinaryHandler(
 
                     // сообщаем тому кто пытался отправить сообщение что чат был зачищен
                     val refreshChats = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-chats", byteArrayOf())))
-                    sendToSessionsOf(user.id, refreshChats)
-                } catch (e: Exception) {
-                    logger.error("Error while sending message, ${e.message}")
+                    webSocketHandler.sendToSessionsOf(user.id, refreshChats)
+                } catch (e: DataIntegrityViolationException) {
+                    // вызывается например когда пользователь еще раз пытается отправить сообщение
+                    // которое уже сохранено в базе
+                    // в таком случае ничего в базе не делается, а пользователь уведомляется о том что сообщение было доставлено
                 }
 
                 // уведомляем пользователя о новом сообщении
                 // и уведомляем отправителя что сообщение было доставлено
                 val refreshMessages = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-messages", byteArrayOf())))
-                sendToSessionsOf(user.id!!, refreshMessages)
-                val countOfSessions = sendToSessionsOf(sendMessage.toId, refreshMessages)
+                webSocketHandler.sendToSessionsOf(user.id!!, refreshMessages)
+                val countOfSessions = webSocketHandler.sendToSessionsOf(sendMessage.toId, refreshMessages)
                 if (countOfSessions == 0) {
                     // если друг не онлайн то отправляем уведомление
                     // он его получит оффлайн

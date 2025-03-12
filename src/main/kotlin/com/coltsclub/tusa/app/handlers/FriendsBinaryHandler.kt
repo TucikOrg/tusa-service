@@ -10,6 +10,7 @@ import com.coltsclub.tusa.app.repository.FriendRequestRepository
 import com.coltsclub.tusa.app.service.FriendsService
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.core.socket.SocketBinaryMessage
+import com.coltsclub.tusa.core.socket.WebSocketHandler
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -27,19 +28,12 @@ class FriendsBinaryHandler(
     private val friendRequestRepository: FriendRequestRepository,
     private val friendsHandlerFull: FriendsHandlerFull
 ) {
-    lateinit var sendToSessionsOf: (Long, BinaryMessage) -> Unit
-
-    init {
-        friendsHandlerFull.sendToSessionsOf = { userId, message ->
-            sendToSessionsOf(userId, message)
-        }
-    }
-
     @OptIn(ExperimentalSerializationApi::class)
     fun handleBinaryMessage(
         socketMessage: SocketBinaryMessage,
         user: UserEntity,
-        session: WebSocketSession
+        session: WebSocketSession,
+        webSocketHandler: WebSocketHandler
     ) {
         when (socketMessage.type) {
             "my-friends" -> {
@@ -51,7 +45,7 @@ class FriendsBinaryHandler(
                 )
                 val data = Cbor.encodeToByteArray(initState)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("my-friends", data))
-                session.sendMessage(BinaryMessage(response))
+                webSocketHandler.sendMessageValidation(session, BinaryMessage(response))
             }
             "add-friend" -> {
                 // Отправить заявку в друзья
@@ -60,8 +54,8 @@ class FriendsBinaryHandler(
 
                 // Отправляем возможному другу информацию о том что ему пришла заявка в друзья
                 val refreshFriendsRequests = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-friends-requests", byteArrayOf())))
-                sendToSessionsOf(id, refreshFriendsRequests)
-                sendToSessionsOf(user.id, refreshFriendsRequests)
+                webSocketHandler.sendToSessionsOf(id, refreshFriendsRequests)
+                webSocketHandler.sendToSessionsOf(user.id, refreshFriendsRequests)
             }
             "friends-requests-actions" -> {
                 val appTimePoint = Cbor.decodeFromByteArray<Long>(socketMessage.data)
@@ -91,7 +85,7 @@ class FriendsBinaryHandler(
                 }
                 val actionsBinary = Cbor.encodeToByteArray(SocketBinaryMessage("friends-requests-actions", Cbor.encodeToByteArray(friendsRequestsDto)))
                 val response = BinaryMessage(actionsBinary)
-                session.sendMessage(response)
+                webSocketHandler.sendMessageValidation(session, response)
             }
             "friends-actions" -> {
                 val appTimePoint = Cbor.decodeFromByteArray<Long>(socketMessage.data)
@@ -123,11 +117,11 @@ class FriendsBinaryHandler(
 
                 val actionsBinary = Cbor.encodeToByteArray(SocketBinaryMessage("friends-actions", Cbor.encodeToByteArray(friendsActionsDto)))
                 val response = BinaryMessage(actionsBinary)
-                session.sendMessage(response)
+                webSocketHandler.sendMessageValidation(session, response)
             }
             "accept-friend" -> {
                 // один участник которому отправили заявку в друзья принимает ее и добавляет другого участника в друзья
-                friendsHandlerFull.createFriends(socketMessage, user)
+                friendsHandlerFull.createFriends(socketMessage, user, webSocketHandler)
             }
             "delete-friend" -> {
                 val id = Cbor.decodeFromByteArray<Long>(socketMessage.data)
@@ -135,11 +129,11 @@ class FriendsBinaryHandler(
 
                 // отправляем мне информацию о том что друг удален
                 val dataForMe = Cbor.encodeToByteArray(SocketBinaryMessage("refresh-friends", byteArrayOf()))
-                sendToSessionsOf(user.id, BinaryMessage(dataForMe))
+                webSocketHandler.sendToSessionsOf(user.id, BinaryMessage(dataForMe))
 
                 // отправляем другу информацию о том что он удален
                 val dataForFriend = Cbor.encodeToByteArray(SocketBinaryMessage("refresh-friends", byteArrayOf()))
-                sendToSessionsOf(id, BinaryMessage(dataForFriend))
+                webSocketHandler.sendToSessionsOf(id, BinaryMessage(dataForFriend))
             }
             "friends-requests" -> {
                 // получить мои заявки в друзья
@@ -150,7 +144,7 @@ class FriendsBinaryHandler(
                 )
                 val data = Cbor.encodeToByteArray(friendsRequestsInitializationState)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("friends-requests", data))
-                sendToSessionsOf(user.id, BinaryMessage(response))
+                webSocketHandler.sendToSessionsOf(user.id, BinaryMessage(response))
             }
             "delete-request" -> {
                 // удалить заявку в друзья которую мне отправили
@@ -159,7 +153,7 @@ class FriendsBinaryHandler(
 
                 // обновить мое состояние локальное
                 val dataForMe = Cbor.encodeToByteArray(SocketBinaryMessage("refresh-friends-requests", Cbor.encodeToByteArray(id)))
-                sendToSessionsOf(user.id, BinaryMessage(dataForMe))
+                webSocketHandler.sendToSessionsOf(user.id, BinaryMessage(dataForMe))
             }
         }
     }

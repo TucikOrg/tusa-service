@@ -7,6 +7,7 @@ import com.coltsclub.tusa.app.service.FriendsService
 import com.coltsclub.tusa.app.service.LocationService
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.core.socket.SocketBinaryMessage
+import com.coltsclub.tusa.core.socket.WebSocketHandler
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
@@ -19,11 +20,9 @@ class FriendsHandlerFull(
     private val friendsService: FriendsService,
     private val locationService: LocationService
 ) {
-    lateinit var sendToSessionsOf: (Long, BinaryMessage) -> Unit
-    lateinit var sessionsContains: (Long) -> Boolean
 
     @OptIn(ExperimentalSerializationApi::class)
-    fun createFriends(socketMessage: SocketBinaryMessage, user: UserEntity) {
+    fun createFriends(socketMessage: SocketBinaryMessage, user: UserEntity, webSocketHandler: WebSocketHandler) {
         val id = Cbor.decodeFromByteArray<Long>(socketMessage.data)
 
         // новые друзья
@@ -32,29 +31,29 @@ class FriendsHandlerFull(
         // отправляем мне информацию о том что друг добавлен
         val refreshFriends = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-friends", byteArrayOf())))
         val refreshFriendsRequests = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-friends-requests", byteArrayOf())))
-        sendToSessionsOf(user.id, refreshFriends)
-        sendToSessionsOf(user.id, refreshFriendsRequests)
+        webSocketHandler.sendToSessionsOf(user.id, refreshFriends)
+        webSocketHandler.sendToSessionsOf(user.id, refreshFriendsRequests)
 
         // отправляем другу информацию о том что он добавлен
-        sendToSessionsOf(id, refreshFriends)
-        sendToSessionsOf(id, refreshFriendsRequests)
+        webSocketHandler.sendToSessionsOf(id, refreshFriends)
+        webSocketHandler.sendToSessionsOf(id, refreshFriendsRequests)
 
 
         // отправляем мне информацию о том в онлайне ли друг
-        val isFriendOnline = IsOnlineDto(userId = id, isOnline = sessionsContains(id))
+        val isFriendOnline = IsOnlineDto(userId = id, isOnline = webSocketHandler.sessionsContains(id))
         val isFriendOnlineData = Cbor.encodeToByteArray(isFriendOnline)
         val friendIsOnlineResponse = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("is-online", isFriendOnlineData)))
-        sendToSessionsOf(user.id, friendIsOnlineResponse)
+        webSocketHandler.sendToSessionsOf(user.id, friendIsOnlineResponse)
 
         // отправляем другу информацию о том в онлайне ли я
-        val isMeOnline = IsOnlineDto(userId = user.id, isOnline = sessionsContains(user.id))
+        val isMeOnline = IsOnlineDto(userId = user.id, isOnline = webSocketHandler.sessionsContains(user.id))
         val isMeOnlineData = Cbor.encodeToByteArray(isMeOnline)
         val meIsOnlineResponse = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("is-online", isMeOnlineData)))
-        sendToSessionsOf(id, meIsOnlineResponse)
+        webSocketHandler.sendToSessionsOf(id, meIsOnlineResponse)
 
 
         // отправляем другу мою локацию
-        val myLocation = locationService.getLastLocation(user.id)
+        val myLocation = locationService.getLastLocationIfVisible(user.id)
         if (myLocation != null) {
             val response = Cbor.encodeToByteArray(SocketBinaryMessage("update-location", Cbor.encodeToByteArray(
                 UpdateLocationDto(
@@ -63,12 +62,12 @@ class FriendsHandlerFull(
                     longitude = myLocation.longitude
                 )
             )))
-            sendToSessionsOf(id, BinaryMessage(response))
+            webSocketHandler.sendToSessionsOf(id, BinaryMessage(response))
         }
 
 
         // отправляем мне локацию друга
-        val friendLocation = locationService.getLastLocation(id)
+        val friendLocation = locationService.getLastLocationIfVisible(id)
         if (friendLocation != null) {
             val response2 = Cbor.encodeToByteArray(SocketBinaryMessage("update-location", Cbor.encodeToByteArray(
                 UpdateLocationDto(
@@ -77,12 +76,12 @@ class FriendsHandlerFull(
                     longitude = friendLocation.longitude
                 )
             )))
-            sendToSessionsOf(user.id, BinaryMessage(response2))
+            webSocketHandler.sendToSessionsOf(user.id, BinaryMessage(response2))
         }
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    fun sendLocationsToFriends(userId: Long, addLocationDto: AddLocationDto) {
+    fun sendLocationsToFriends(userId: Long, addLocationDto: AddLocationDto, webSocketHandler: WebSocketHandler) {
         val friends = friendsService.getFriends(userId)
         val ids = friends.map { it.id }
         ids.forEach { friendId ->
@@ -93,7 +92,22 @@ class FriendsHandlerFull(
                 longitude = addLocationDto.longitude
             )
             )))
-            sendToSessionsOf(friendId, BinaryMessage(response))
+            webSocketHandler.sendToSessionsOf(friendId, BinaryMessage(response))
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun sendMyLocationVisibleState(userId: Long, isVisible: Boolean, webSocketHandler: WebSocketHandler) {
+        val friends = friendsService.getFriends(userId)
+        val ids = friends.map { it.id }
+        ids.forEach { friendId ->
+            val response = Cbor.encodeToByteArray(SocketBinaryMessage("update-location-visible", Cbor.encodeToByteArray(
+                com.coltsclub.tusa.app.dto.IsMyLocationVisibleStateDto(
+                    ownerId = userId,
+                    isMyLocationVisible = isVisible
+                )
+            )))
+            webSocketHandler.sendToSessionsOf(friendId, BinaryMessage(response))
         }
     }
 }

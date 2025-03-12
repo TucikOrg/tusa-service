@@ -12,6 +12,7 @@ class LocationEntity(
     var ownerId: Long,
     val latitude: String,
     val longitude: String,
+    var hideMe: Boolean = false,
     val creation: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC)
 ) {
     @Id

@@ -3,8 +3,9 @@ package com.coltsclub.tusa.app.service
 import com.coltsclub.tusa.app.dto.LocationDto
 import com.coltsclub.tusa.app.entity.LocationEntity
 import com.coltsclub.tusa.app.repository.LocationRepository
-import com.coltsclub.tusa.core.exceptions.TucikBadRequest
 import com.coltsclub.tusa.core.service.EncryptionService
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import javax.crypto.SecretKey
 import kotlin.jvm.optionals.getOrNull
 import org.springframework.beans.factory.annotation.Value
@@ -29,10 +30,18 @@ class LocationService(
         return secretKey!!
     }
 
-    fun getUsersLocations(userId: Long, usersIds: List<Long>): List<LocationDto> {
+    fun getUsersLocations(usersIds: List<Long>): List<LocationDto> {
+        val now = LocalDateTime.now(ZoneOffset.UTC)
         val locations = usersIds.map { id ->
             val location = locationRepository.findTopByOwnerIdAndByOrderByCreationDesc(id)
             if (location.isEmpty) {
+                return@map null
+            }
+            if (location.get().hideMe == true) {
+                return@map null
+            }
+            // слишком старая локация
+            if (location.get().creation.plusDays(5) < now) {
                 return@map null
             }
             return@map location.get()
@@ -49,8 +58,11 @@ class LocationService(
         }
     }
 
-    fun getLastLocation(ownerId: Long): LocationDto? {
+    fun getLastLocationIfVisible(ownerId: Long): LocationDto? {
         val location = locationRepository.findTopByOwnerIdAndByOrderByCreationDesc(ownerId).getOrNull()?: return null
+        if (location.hideMe == true) {
+            return null
+        }
         val longitude = encryptionService.decrypt(location.longitude, getSecretKey()).toFloat()
         val latitude = encryptionService.decrypt(location.latitude, getSecretKey()).toFloat()
         return LocationDto(
@@ -70,5 +82,12 @@ class LocationService(
             longitude = encLongitude,
         )
         locationRepository.save(entity)
+    }
+
+    fun setVisibleLocationStateMe(userId: Long, visible: Boolean) {
+        locationRepository.findTopByOwnerIdAndByOrderByCreationDesc(userId).getOrNull()?.let {
+            it.hideMe = !visible
+            locationRepository.save(it)
+        }
     }
 }

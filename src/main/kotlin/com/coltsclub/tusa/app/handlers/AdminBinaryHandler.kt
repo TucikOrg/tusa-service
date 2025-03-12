@@ -14,6 +14,7 @@ import com.coltsclub.tusa.app.service.LocationService
 import com.coltsclub.tusa.app.service.ProfileService
 import com.coltsclub.tusa.core.entity.UserEntity
 import com.coltsclub.tusa.core.socket.SocketBinaryMessage
+import com.coltsclub.tusa.core.socket.WebSocketHandler
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
@@ -30,19 +31,13 @@ class AdminBinaryHandler(
     private val locationsService: LocationService,
     private val friendsHandlerFull: FriendsHandlerFull
 ) {
-    lateinit var sendToSessionsOf: (Long, BinaryMessage) -> Int
-
-    init {
-        friendsHandlerFull.sendToSessionsOf = { userId, message ->
-            sendToSessionsOf(userId, message)
-        }
-    }
 
     @OptIn(ExperimentalSerializationApi::class)
     fun handleBinaryMessage(
         socketMessage: SocketBinaryMessage,
         user: UserEntity,
-        session: WebSocketSession
+        session: WebSocketSession,
+        webSocketHandler: WebSocketHandler
     ) {
         when (socketMessage.type) {
             "create-user" -> {
@@ -56,7 +51,7 @@ class AdminBinaryHandler(
                     )
                 )
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("created-user", data))
-                session.sendMessage(BinaryMessage(response))
+                webSocketHandler.sendMessageValidation(session, BinaryMessage(response))
             }
             "all-users" -> {
                 val request = Cbor.decodeFromByteArray<AllUsersRequest>(socketMessage.data)
@@ -72,32 +67,33 @@ class AdminBinaryHandler(
                 )
                 val data = Cbor.encodeToByteArray(usersPage)
                 val response = Cbor.encodeToByteArray(SocketBinaryMessage("all-users", data))
-                session.sendMessage(BinaryMessage(response))
+                webSocketHandler.sendMessageValidation(session, BinaryMessage(response))
             }
             "force-friends" -> {
-                friendsHandlerFull.createFriends(socketMessage, user)
+                friendsHandlerFull.createFriends(socketMessage, user, webSocketHandler = webSocketHandler)
             }
             "change-name-other" -> {
                 val changeNameOther = Cbor.decodeFromByteArray<ChangeNameOther>(socketMessage.data)
-                profileService.changeName(changeNameOther.userId, changeNameOther.name) { userId, message ->
-                    sendToSessionsOf(userId, message)
-                }
+                profileService.changeName(changeNameOther.userId, changeNameOther.name, webSocketHandler)
             }
             "change-unique-name-other" -> {
                 val changeNameOther = Cbor.decodeFromByteArray<ChangeNameOther>(socketMessage.data)
-                val success = profileService.changeUniqueName(changeNameOther.userId, changeNameOther.name, sendToSessionsOf)
+                val success = profileService.changeUniqueName(changeNameOther.userId, changeNameOther.name, webSocketHandler)
             }
             "create-request-to-me" -> {
                 val id = Cbor.decodeFromByteArray<Long>(socketMessage.data)
                 friendsService.addFriend(id, user.id!!)
                 val refreshFriendsRequests = BinaryMessage(Cbor.encodeToByteArray(SocketBinaryMessage("refresh-friends-requests", byteArrayOf())))
-                sendToSessionsOf(id, refreshFriendsRequests)
-                sendToSessionsOf(user.id, refreshFriendsRequests)
+                webSocketHandler.sendToSessionsOf(id, refreshFriendsRequests)
+                webSocketHandler.sendToSessionsOf(user.id, refreshFriendsRequests)
             }
             "fake-location" -> {
                 val fakeLocation = Cbor.decodeFromByteArray<FakeLocation>(socketMessage.data)
                 locationsService.fakeLocation(fakeLocation.latitude, fakeLocation.longitude, fakeLocation.userId)
-                friendsHandlerFull.sendLocationsToFriends(fakeLocation.userId, AddLocationDto(fakeLocation.latitude, fakeLocation.longitude))
+                friendsHandlerFull.sendLocationsToFriends(fakeLocation.userId,
+                    AddLocationDto(fakeLocation.latitude, fakeLocation.longitude),
+                    webSocketHandler
+                )
             }
         }
     }

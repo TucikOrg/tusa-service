@@ -1,5 +1,6 @@
 package com.coltsclub.tusa.app.service
 
+import com.coltsclub.tusa.app.entity.ImageEntity
 import com.coltsclub.tusa.app.repository.AvatarRepository
 import com.coltsclub.tusa.app.repository.ImageRepository
 import kotlin.jvm.optionals.getOrNull
@@ -14,6 +15,7 @@ class ImageService(
     }
 
     fun getImageByTempFileId(tempFileId: String, owner: Long): ByteArray? {
-        return imageRepository.findByOwnerIdAndLocalFilePathId(owner, tempFileId)?.image
+        val result = imageRepository.findByOwnerIdAndLocalFilePathId(owner, tempFileId).maxByOrNull { it.id!! }
+        return result?.image
     }
 }
