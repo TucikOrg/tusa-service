@@ -14,7 +14,6 @@ jobs:
 
       - name: Build
         run: |
-          export JAVA_HOME=/usr/bin/java
           cp /root/tucik/backend/application.properties $pwd/application.properties
           cp /root/tucik/backend/tucik-e0058-firebase-adminsdk-fbsvc-930035d462.json $pwd/tucik-e0058-firebase-adminsdk-fbsvc-930035d462.json
           chmod +x gradlew
