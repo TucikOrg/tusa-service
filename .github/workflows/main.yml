@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
     steps:
       # Check out the repository code
       - uses: actions/checkout@v4
